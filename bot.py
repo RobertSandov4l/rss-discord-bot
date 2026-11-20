@@ -16,7 +16,7 @@ def cargar_historial():
 
 
 def limpiar_html(texto):
-    limpio = re.sub(r"<[^>]+>", "", texto or "")
+    limpio = re.sub(r"<[^>]+>", " ", texto or "")
     return " ".join(limpio.split())[:350]
 
 
@@ -97,6 +97,11 @@ def main():
             enlace = entry.get("link", "")
             resumen = limpiar_html(entry.get("summary") or entry.get("description", ""))
             imagen = obtener_imagen(entry, enlace)
+
+            print("DEBUG TITULO:", titulo)
+            print("DEBUG ENLACE:", enlace)
+            print("DEBUG RESUMEN:", resumen)
+            print("DEBUG IMAGEN:", imagen)
 
             embed = {
                 "title": titulo,
