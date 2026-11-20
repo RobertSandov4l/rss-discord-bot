@@ -15,8 +15,39 @@ def cargar_historial():
     return []
 
 
+def extraer_enlace_juego(entry, texto_html):
+    enlace = (entry.get("link") or "").strip()
+    if "store.steampowered.com/app/" in enlace:
+        return enlace
+
+    match_app = re.search(
+        r"https?://store\.steampowered\.com/(?:app|curator)/[^\s\"'<>]+",
+        texto_html or "",
+    )
+    if match_app:
+        return match_app.group(0)
+
+    return enlace
+
+
+def extraer_titulo_limpio(titulo_raw, enlace):
+    titulo = (titulo_raw or "").strip()
+    if not titulo or titulo.lower() == "featured":
+        match_slug = re.search(r"store\.steampowered\.com/app/\d+/([^/?#]+)", enlace or "")
+        if match_slug:
+            return match_slug.group(1).replace("_", " ").replace("-", " ")[:256]
+    return (titulo or "Nueva reseña")[:256]
+
+
 def limpiar_html(texto):
     limpio = re.sub(r"<[^>]+>", " ", texto or "")
+    # Elimina precios como 7,49€, Live24,99€ o $9.99
+    limpio = re.sub(
+        r"\b(?:Live)?\d+[.,]\d{2}\s*€|\$\s*\d+[.,]\d{2}",
+        " ",
+        limpio,
+        flags=re.IGNORECASE,
+    )
     return " ".join(limpio.split())[:350]
 
 
@@ -93,9 +124,15 @@ def main():
             if not uid or uid in historial:
                 continue
 
-            titulo = entry.get("title", "Nueva publicación")[:256]
-            enlace = entry.get("link", "")
-            resumen = limpiar_html(entry.get("summary") or entry.get("description", ""))
+            bloque_raw = " ".join([
+                entry.get("summary", ""),
+                entry.get("description", ""),
+                " ".join(c.get("value", "") for c in entry.get("content", [])),
+            ])
+
+            enlace = extraer_enlace_juego(entry, bloque_raw)
+            titulo = extraer_titulo_limpio(entry.get("title"), enlace)
+            resumen = limpiar_html(bloque_raw)
             imagen = obtener_imagen(entry, enlace)
 
             print("DEBUG TITULO:", titulo)
