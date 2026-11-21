@@ -84,6 +84,7 @@ def extraer_appid_steam(texto):
 def obtener_claves_entrada(entry, bloque_raw=""):
     uid = (entry.get("id") or entry.get("link") or "").strip()
     link = (entry.get("link") or "").strip()
+    titulo = re.sub(r"\s+", " ", (entry.get("title") or "").strip().lower())
     claves = []
 
     if uid:
@@ -98,6 +99,11 @@ def obtener_claves_entrada(entry, bloque_raw=""):
         clave_app = f"steam_app:{appid}"
         if clave_app not in claves:
             claves.append(clave_app)
+
+    if titulo and (url_limpia or appid):
+        clave_titulo_ref = f"item:{titulo}|{appid or url_limpia}"
+        if clave_titulo_ref not in claves:
+            claves.append(clave_titulo_ref)
 
     return claves
 
@@ -163,6 +169,39 @@ def extraer_titulo_limpio(titulo_raw, enlace):
     return (titulo or "Nueva publicacion")[:256]
 
 
+def deduplicar_texto_repetido(texto):
+    limpio = " ".join((texto or "").split()).strip()
+    if not limpio:
+        return ""
+
+    # Si el texto completo es dos repeticiones exactas o casi exactas pegadas
+    mitad = len(limpio) // 2
+    for delta in range(-25, 26):
+        corte = mitad + delta
+        if 20 < corte < len(limpio) - 10:
+            parte_a = limpio[:corte].strip(" .;-")
+            parte_b = limpio[corte:].strip(" .;-")
+            if parte_a and parte_a.lower() == parte_b.lower():
+                limpio = limpio[:corte].strip()
+                break
+
+    # Elimina oraciones o segmentos repetidos consecutivos
+    segmentos = [s.strip() for s in re.split(r"(?<=[.!?])\s+", limpio) if s.strip()]
+    resultado = []
+    claves_vistas = set()
+    for seg in segmentos:
+        clave = re.sub(r"[^a-z0-9áéíóúñ]+", "", seg.lower())
+        if len(clave) >= 15 and clave in claves_vistas:
+            continue
+        if resultado and re.sub(r"[^a-z0-9áéíóúñ]+", "", resultado[-1].lower()) == clave:
+            continue
+        resultado.append(seg)
+        if len(clave) >= 15:
+            claves_vistas.add(clave)
+
+    return " ".join(resultado).strip()
+
+
 def limpiar_html(texto):
     raw = texto or ""
 
@@ -206,6 +245,7 @@ def limpiar_html(texto):
         if match_jh_texto:
             limpio = limpio[: match_jh_texto.end()]
 
+    limpio = deduplicar_texto_repetido(limpio)
     return limpio[:600]
 
 
@@ -576,6 +616,8 @@ def main():
             claves = obtener_claves_entrada(e, bloque_previo)
             if claves and not ya_registrado(claves, historial_set):
                 entradas_nuevas.append((e, claves))
+                for c in claves:
+                    historial_set.add(c)
 
         if not entradas_nuevas:
             print(f"Sin novedades en {feed_cfg.get('nombre', 'Feed')}.")
@@ -586,9 +628,9 @@ def main():
 
             if solo_semilla:
                 for c in claves:
-                    if c not in historial_set:
+                    if c not in historial:
                         historial.append(c)
-                        historial_set.add(c)
+                    historial_set.add(c)
                 cambios_historial = True
                 print(f"[SEMILLA] Registrado sin enviar: {uid}")
                 continue
@@ -655,9 +697,9 @@ def main():
             )
             if resp.status_code in (200, 204):
                 for c in claves:
-                    if c not in historial_set:
+                    if c not in historial:
                         historial.append(c)
-                        historial_set.add(c)
+                    historial_set.add(c)
                 cambios_historial = True
 
                 nombre_feed_actual = feed_cfg.get("nombre", "")
@@ -684,7 +726,7 @@ def main():
                 print(f"Error al publicar ({resp.status_code}): {resp.text}")
 
     if cambios_historial:
-        guardar_lista_json(HISTORIAL_FILE, historial[-1500:])
+        guardar_lista_json(HISTORIAL_FILE, historial[-2500:])
     if cambios_log:
         guardar_lista_json(LOG_FILE, log_envios[-2000:])
     for ruta_individual in feeds_con_log_nuevo:
