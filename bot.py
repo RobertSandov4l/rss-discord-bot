@@ -100,14 +100,49 @@ def extraer_titulo_limpio(titulo_raw, enlace):
 
 
 def limpiar_html(texto):
-    limpio = re.sub(r"<[^>]+>", " ", texto or "")
+    raw = texto or ""
+
+    # Convierte etiquetas <a href="URL">texto</a> a enlaces Markdown [texto](URL)
+    def reemplazar_link(match):
+        href = match.group(1).strip()
+        etiqueta = re.sub(r"<[^>]+>", "", match.group(2)).strip()
+        if href.startswith("http") and etiqueta:
+            return f"[{etiqueta}]({href})"
+        return etiqueta
+
+    con_links = re.sub(
+        r'<a\b[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',
+        reemplazar_link,
+        raw,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+
+    # Quita el resto de etiquetas HTML y precios
+    limpio = re.sub(r"<[^>]+>", " ", con_links)
     limpio = re.sub(
         r"\b(?:Live)?\d+[.,]\d{2}\s*€|\$\s*\d+[.,]\d{2}",
         " ",
         limpio,
         flags=re.IGNORECASE,
     )
-    return " ".join(limpio.split())[:350]
+    limpio = " ".join(limpio.split())
+
+    # Si aparece [Juego Hispano](url) o "Juego Hispano", corta justo ahi para evitar texto duplicado
+    match_jh_link = re.search(
+        r"(\[Juego\s+Hispano\]\(https?://[^\s)]+\))",
+        limpio,
+        flags=re.IGNORECASE,
+    )
+    if match_jh_link:
+        limpio = limpio[: match_jh_link.end()]
+    else:
+        match_jh_texto = re.search(
+            r"\bJuego\s+Hispano\b", limpio, flags=re.IGNORECASE
+        )
+        if match_jh_texto:
+            limpio = limpio[: match_jh_texto.end()]
+
+    return limpio[:600]
 
 
 def obtener_autor(entry, feed_cfg, texto_plano=""):
