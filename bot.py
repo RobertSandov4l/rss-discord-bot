@@ -157,8 +157,24 @@ def parsear_color(valor_color, defecto=7225568):
     return defecto
 
 
+def desempaquetar_url_steam(url):
+    u = (url or "").strip()
+    if not u:
+        return ""
+    match_lf = re.search(
+        r"https?://steamcommunity\.com/linkfilter/\?(?:url=|u=)([^&\s\"'<>)]+)",
+        u,
+        flags=re.IGNORECASE,
+    )
+    if match_lf:
+        decodificada = urllib.parse.unquote(match_lf.group(1)).strip()
+        if decodificada.startswith(("http://", "https://")):
+            return decodificada
+    return u
+
+
 def extraer_enlace_juego(entry, texto_html):
-    enlace = (entry.get("link") or "").strip()
+    enlace = desempaquetar_url_steam((entry.get("link") or "").strip())
     if "store.steampowered.com/app/" in enlace:
         return enlace
 
@@ -167,13 +183,13 @@ def extraer_enlace_juego(entry, texto_html):
         texto_html or "",
     )
     if match_app:
-        return match_app.group(0)
+        return desempaquetar_url_steam(match_app.group(0))
 
     return enlace
 
 
 def _es_url_resena_valida(url):
-    u = (url or "").strip()
+    u = desempaquetar_url_steam((url or "").strip())
     if not u.startswith(("http://", "https://")):
         return False
     low = u.lower()
@@ -183,18 +199,19 @@ def _es_url_resena_valida(url):
 
 
 def extraer_enlace_resena(entry, texto_html, enlace_juego=""):
-    comentario = (entry.get("comments") or "").strip()
+    comentario = desempaquetar_url_steam((entry.get("comments") or "").strip())
     if _es_url_resena_valida(comentario):
         return comentario
 
-    link_entry = (entry.get("link") or "").strip()
+    link_entry = desempaquetar_url_steam((entry.get("link") or "").strip())
     if _es_url_resena_valida(link_entry):
         return link_entry
 
     urls = re.findall(r"https?://[^\s\"'<>)\]]+", texto_html or "")
     for u in urls:
-        if _es_url_resena_valida(u):
-            return u
+        limpia = desempaquetar_url_steam(u)
+        if _es_url_resena_valida(limpia):
+            return limpia
 
     return ""
 
@@ -249,16 +266,20 @@ def deduplicar_texto_repetido(texto):
 def limpiar_html(
     texto,
     url_resena="",
+    incluir_leer_resena=False,
     etiqueta_enlace="Juego Hispano",
     frase_previa="Leer reseña completa en",
 ):
     raw = texto or ""
 
-    # Convierte etiquetas <a href="URL">texto</a> a enlaces Markdown [texto](URL)
+    # Convierte etiquetas <a href="URL">texto</a> a enlaces Markdown clicables limpios
     def reemplazar_link(match):
-        href = match.group(1).strip()
+        href = desempaquetar_url_steam(match.group(1).strip())
         etiqueta = re.sub(r"<[^>]+>", "", match.group(2)).strip()
-        if href.startswith("http") and etiqueta:
+        etiqueta = desempaquetar_url_steam(etiqueta)
+        if href.startswith(("http://", "https://")):
+            if not etiqueta or etiqueta == href:
+                return href
             return f"[{etiqueta}]({href})"
         return etiqueta
 
@@ -277,9 +298,36 @@ def limpiar_html(
         limpio,
         flags=re.IGNORECASE,
     )
+
+    # Limpia enlaces markdown rotos del tipo [https://url](https://steamcommunity.com/linkfilter/?u=...)
+    def limpiar_md_link(match):
+        texto_visible = desempaquetar_url_steam(match.group(1).strip())
+        destino = desempaquetar_url_steam(match.group(2).strip())
+        if destino.startswith(("http://", "https://")):
+            if not texto_visible or texto_visible == destino:
+                return destino
+            return f"[{texto_visible}]({destino})"
+        return texto_visible
+
+    limpio = re.sub(
+        r"\[([^\]]+)\]\((https?://[^\s)]+)\)", limpiar_md_link, limpio
+    )
     limpio = " ".join(limpio.split())
 
-    # Si aparece [Juego Hispano](url) o "Juego Hispano", corta justo ahi para evitar texto duplicado
+    # Quita cualquier remate previo de "Leer reseña completa en [Juego Hispano](...)" o "Juego Hispano"
+    limpio = re.sub(
+        r"\s*\.?\s*Leer\s+reseña\s+completa\s+en\s+\[[^\]]+\]\(https?://[^\s)]+\)\s*$",
+        "",
+        limpio,
+        flags=re.IGNORECASE,
+    ).strip()
+    limpio = re.sub(
+        r"\s*\.?\s*Leer\s+reseña\s+completa\s+en\s+Juego\s+Hispano\s*$",
+        "",
+        limpio,
+        flags=re.IGNORECASE,
+    ).strip()
+
     match_jh_link = re.search(
         r"(\[Juego\s+Hispano\]\(https?://[^\s)]+\))",
         limpio,
@@ -296,10 +344,10 @@ def limpiar_html(
 
     limpio = deduplicar_texto_repetido(limpio)
 
-    # Si contamos con url_resena permitida, agregamos punto final + frase + enlace al final
+    # Solo agrega "Leer reseña completa en [Juego Hispano](url)" si el feed lo tiene activado y hay URL válida
     etiqueta = (etiqueta_enlace or "Juego Hispano").strip()
     frase = (frase_previa or "Leer reseña completa en").strip()
-    if url_resena and url_resena.startswith("http"):
+    if incluir_leer_resena and url_resena and url_resena.startswith("http"):
         if not re.search(
             rf"\[{re.escape(etiqueta)}\]\(https?://[^\s)]+\)",
             limpio,
@@ -714,10 +762,14 @@ def main():
 
             enlace = extraer_enlace_juego(entry, bloque_raw)
             url_resena = extraer_enlace_resena(entry, bloque_raw, enlace)
+            incluir_leer_resena = bool(
+                feed_cfg.get("incluir_leer_resena", False)
+            )
             titulo = extraer_titulo_limpio(entry.get("title"), enlace)
             resumen = limpiar_html(
                 bloque_raw,
                 url_resena=url_resena,
+                incluir_leer_resena=incluir_leer_resena,
                 etiqueta_enlace=feed_cfg.get("etiqueta_enlace") or "Juego Hispano",
                 frase_previa=feed_cfg.get("frase_enlace") or "Leer reseña completa en",
             )
