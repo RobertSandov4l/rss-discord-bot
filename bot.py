@@ -4,12 +4,14 @@ import os
 import random
 import re
 import time
+import unicodedata
 import urllib.parse
 import feedparser
 import requests
 
 HISTORIAL_FILE = "historial.json"
 LOG_FILE = "log_envios.json"
+LOGS_DIR = "logs"
 ROTACION_FILE = "rotacion_imagenes.json"
 IMAGEN_ULTIMO_RECURSO = "https://i.imgur.com/bBgeQQs.jpeg"
 
@@ -38,8 +40,23 @@ def cargar_lista_json(ruta):
 
 
 def guardar_lista_json(ruta, datos):
+    carpeta = os.path.dirname(ruta)
+    if carpeta:
+        os.makedirs(carpeta, exist_ok=True)
     with open(ruta, "w", encoding="utf-8") as f:
         json.dump(datos, f, indent=2, ensure_ascii=False)
+
+
+def slug_feed(nombre_feed):
+    texto = str(nombre_feed or "feed-sin-nombre").strip().lower()
+    normalizado = unicodedata.normalize("NFKD", texto)
+    sin_acentos = "".join(c for c in normalizado if not unicodedata.combining(c))
+    limpio = re.sub(r"[^a-z0-9]+", "-", sin_acentos).strip("-")
+    return limpio or "feed-sin-nombre"
+
+
+def ruta_log_feed(nombre_feed):
+    return os.path.join(LOGS_DIR, f"{slug_feed(nombre_feed)}.json")
 
 
 def cargar_dict_json(ruta):
@@ -473,6 +490,8 @@ def main():
 
     historial = cargar_lista_json(HISTORIAL_FILE)
     log_envios = cargar_lista_json(LOG_FILE)
+    logs_por_feed = {}
+    feeds_con_log_nuevo = set()
     rotacion_state = cargar_dict_json(ROTACION_FILE)
 
     cambios_historial = False
@@ -584,15 +603,25 @@ def main():
                 historial.append(uid)
                 cambios_historial = True
 
-                log_envios.append({
+                nombre_feed_actual = feed_cfg.get("nombre", "")
+                registro_envio = {
                     "fecha_envio_utc": datetime.now(timezone.utc).isoformat(),
-                    "feed": feed_cfg.get("nombre", ""),
+                    "feed": nombre_feed_actual,
                     "channel_id": str(feed_cfg.get("channel_id", "")),
                     "titulo": titulo,
                     "enlace": enlace,
                     "uid": uid,
-                })
+                }
+                log_envios.append(registro_envio)
                 cambios_log = True
+
+                ruta_individual = ruta_log_feed(nombre_feed_actual)
+                if ruta_individual not in logs_por_feed:
+                    logs_por_feed[ruta_individual] = cargar_lista_json(
+                        ruta_individual
+                    )
+                logs_por_feed[ruta_individual].append(registro_envio)
+                feeds_con_log_nuevo.add(ruta_individual)
                 print(f"Publicado: {titulo}")
             else:
                 print(f"Error al publicar ({resp.status_code}): {resp.text}")
@@ -601,6 +630,10 @@ def main():
         guardar_lista_json(HISTORIAL_FILE, historial[-1000:])
     if cambios_log:
         guardar_lista_json(LOG_FILE, log_envios[-2000:])
+    for ruta_individual in feeds_con_log_nuevo:
+        guardar_lista_json(
+            ruta_individual, logs_por_feed[ruta_individual][-1000:]
+        )
     if cambios_rotacion[0]:
         guardar_dict_json(ROTACION_FILE, rotacion_state)
 
