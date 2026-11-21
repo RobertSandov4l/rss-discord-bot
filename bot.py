@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 import json
 import os
+import random
 import re
 import time
 import urllib.parse
@@ -10,6 +11,7 @@ import requests
 HISTORIAL_FILE = "historial.json"
 LOG_FILE = "log_envios.json"
 ROTACION_FILE = "rotacion_imagenes.json"
+IMAGEN_ULTIMO_RECURSO = "https://i.imgur.com/bBgeQQs.jpeg"
 
 HEADERS_WEB = {
     "User-Agent": (
@@ -173,6 +175,22 @@ def url_imagen_accesible(url):
     return False
 
 
+def buscar_imagen_por_appid_en_texto(texto_y_enlace):
+    matches = re.findall(
+        r"https?://store\.steampowered\.com/app/(\d+)",
+        texto_y_enlace or "",
+        flags=re.IGNORECASE,
+    )
+    for appid in matches:
+        header_url = (
+            f"https://shared.akamai.steamstatic.com/"
+            f"store_item_assets/steam/apps/{appid}/header.jpg"
+        )
+        if url_imagen_accesible(header_url):
+            return header_url
+    return None
+
+
 def extraer_posible_juego(titulo, descripcion_limpia):
     texto_titulo = (titulo or "").strip()
 
@@ -271,7 +289,7 @@ def buscar_og_image_en_url(url_objetivo):
     return None
 
 
-def obtener_imagen_rotativa(feed_cfg, rotacion_state):
+def obtener_imagen_desde_lista(feed_cfg, rotacion_state, cambios_rotacion_ref):
     lista_imgs = feed_cfg.get("imagenes")
     if not isinstance(lista_imgs, list) or not lista_imgs:
         return None
@@ -281,14 +299,26 @@ def obtener_imagen_rotativa(feed_cfg, rotacion_state):
     if not urls_validas:
         return None
 
+    modo_aleatorio = bool(feed_cfg.get("imagenes_aleatorias", False))
+    if modo_aleatorio:
+        candidatas = urls_validas.copy()
+        random.shuffle(candidatas)
+        for url in candidatas:
+            if url_imagen_accesible(url):
+                return url
+        return None
+
     clave_feed = str(
         feed_cfg.get("nombre") or feed_cfg.get("rss_url") or "default"
     )
-    idx_actual = int(rotacion_state.get(clave_feed, 0)) % len(urls_validas)
-    imagen_elegida = urls_validas[idx_actual]
-    rotacion_state[clave_feed] = (idx_actual + 1) % len(urls_validas)
-    if url_imagen_accesible(imagen_elegida):
-        return imagen_elegida
+    idx_base = int(rotacion_state.get(clave_feed, 0)) % len(urls_validas)
+    for offset in range(len(urls_validas)):
+        idx = (idx_base + offset) % len(urls_validas)
+        candidata = urls_validas[idx]
+        if url_imagen_accesible(candidata):
+            rotacion_state[clave_feed] = (idx + 1) % len(urls_validas)
+            cambios_rotacion_ref[0] = True
+            return candidata
     return None
 
 
@@ -320,17 +350,6 @@ def obtener_imagen(
     titulo_limpio="",
     resumen_limpio="",
 ):
-    usar_rotacion = feed_cfg.get("rotar_imagenes", False)
-    if (
-        usar_rotacion
-        and isinstance(feed_cfg.get("imagenes"), list)
-        and feed_cfg["imagenes"]
-    ):
-        img_rot = obtener_imagen_rotativa(feed_cfg, rotacion_state)
-        if img_rot:
-            cambios_rotacion_ref[0] = True
-            return img_rot
-
     if "media_content" in entry and entry.media_content:
         url = entry.media_content[0].get("url")
         if url and url_imagen_accesible(url):
@@ -363,6 +382,11 @@ def obtener_imagen(
         if url_imagen_accesible(match_img.group(1)):
             return match_img.group(1)
 
+    # Portada directa si hay enlace de juego en Steam (incluyendo sorteos con link de app)
+    img_appid = buscar_imagen_por_appid_en_texto(f"{enlace or ''} {texto_completo}")
+    if img_appid:
+        return img_appid
+
     if feed_cfg.get("buscar_imagen_juego", True):
         posible_juego = extraer_posible_juego(titulo_limpio, resumen_limpio)
         img_steam = buscar_imagen_en_steam(posible_juego)
@@ -371,7 +395,7 @@ def obtener_imagen(
 
     urls_en_texto = re.findall(r"https?://[^\s\"'<>)\]]+", texto_completo)
     for u in urls_en_texto:
-        if "steamcommunity.com" in u:
+        if "steamcommunity.com" in u or "facebook.com" in u:
             continue
         og = buscar_og_image_en_url(u)
         if og:
@@ -388,7 +412,21 @@ def obtener_imagen(
     if img_plat:
         return img_plat
 
-    return None
+    usar_lista_fallback = feed_cfg.get("rotar_en_fallback", True)
+    if usar_lista_fallback:
+        img_lista = obtener_imagen_desde_lista(
+            feed_cfg, rotacion_state, cambios_rotacion_ref
+        )
+        if img_lista:
+            return img_lista
+
+    img_defecto = (
+        feed_cfg.get("imagen_defecto") or IMAGEN_ULTIMO_RECURSO
+    ).strip()
+    if img_defecto and url_imagen_accesible(img_defecto):
+        return img_defecto
+
+    return img_defecto or None
 
 
 def main():
