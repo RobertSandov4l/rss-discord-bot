@@ -24,11 +24,16 @@ jobs:
         env:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           FEEDS_JSON: ${{ secrets.FEEDS_JSON }}
+          SEMILLA_SIN_ENVIAR: ${{ vars.SEMILLA_SIN_ENVIAR || 'false' }}
         run: python bot.py
 
-      - name: Guardar historial
+      - name: Guardar historial y log
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add historial.json || true
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Actualizar historial" && git push)
+          git add historial.json log_envios.json || true
+          if ! git diff --quiet || ! git diff --staged --quiet; then
+            git commit -m "Actualizar historial y log"
+            git pull --rebase origin main || true
+            git push
+          fi
