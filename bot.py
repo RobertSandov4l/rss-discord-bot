@@ -8,6 +8,7 @@ import requests
 
 HISTORIAL_FILE = "historial.json"
 LOG_FILE = "log_envios.json"
+ROTACION_FILE = "rotacion_imagenes.json"
 
 
 def cargar_lista_json(ruta):
@@ -26,6 +27,25 @@ def cargar_lista_json(ruta):
 
 
 def guardar_lista_json(ruta, datos):
+    with open(ruta, "w", encoding="utf-8") as f:
+        json.dump(datos, f, indent=2, ensure_ascii=False)
+
+
+def cargar_dict_json(ruta):
+    if os.path.exists(ruta):
+        try:
+            with open(ruta, "r", encoding="utf-8") as f:
+                contenido = f.read().strip()
+                if not contenido:
+                    return {}
+                datos = json.loads(contenido)
+                return datos if isinstance(datos, dict) else {}
+        except Exception:
+            return {}
+    return {}
+
+
+def guardar_dict_json(ruta, datos):
     with open(ruta, "w", encoding="utf-8") as f:
         json.dump(datos, f, indent=2, ensure_ascii=False)
 
@@ -110,7 +130,61 @@ def obtener_fecha_texto(entry):
     return datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
 
 
-def obtener_imagen(entry, enlace):
+def buscar_og_image_en_url(url_objetivo):
+    if not url_objetivo or not url_objetivo.startswith("http"):
+        return None
+    try:
+        resp = requests.get(
+            url_objetivo,
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=8,
+            allow_redirects=True,
+        )
+        if not resp.ok:
+            return None
+        og_match = re.search(
+            r'<meta[^>]+(?:property|name)=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
+            resp.text,
+            re.IGNORECASE,
+        )
+        if not og_match:
+            og_match = re.search(
+                r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+(?:property|name)=["\']og:image["\']',
+                resp.text,
+                re.IGNORECASE,
+            )
+        if og_match and og_match.group(1).startswith("http"):
+            return og_match.group(1).strip()
+    except Exception:
+        pass
+    return None
+
+
+def obtener_imagen_rotativa(feed_cfg, rotacion_state):
+    lista_imgs = feed_cfg.get("imagenes")
+    if not isinstance(lista_imgs, list) or not lista_imgs:
+        return None
+    urls_validas = [str(u).strip() for u in lista_imgs if str(u).strip().startswith("http")]
+    if not urls_validas:
+        return None
+
+    clave_feed = str(feed_cfg.get("nombre") or feed_cfg.get("rss_url") or "default")
+    idx_actual = int(rotacion_state.get(clave_feed, 0)) % len(urls_validas)
+    imagen_elegida = urls_validas[idx_actual]
+    rotacion_state[clave_feed] = (idx_actual + 1) % len(urls_validas)
+    return imagen_elegida
+
+
+def obtener_imagen(entry, enlace, feed_cfg, rotacion_state, cambios_rotacion_ref):
+    # 1. Si el feed tiene lista de imagenes rotativas y esta activada (por defecto True si existe la lista)
+    usar_rotacion = feed_cfg.get("rotar_imagenes", True)
+    if usar_rotacion and isinstance(feed_cfg.get("imagenes"), list) and feed_cfg["imagenes"]:
+        img_rot = obtener_imagen_rotativa(feed_cfg, rotacion_state)
+        if img_rot:
+            cambios_rotacion_ref[0] = True
+            return img_rot
+
+    # 2. Imagen directa en campos multimedia del RSS
     if "media_content" in entry and entry.media_content:
         url = entry.media_content[0].get("url")
         if url:
@@ -133,32 +207,28 @@ def obtener_imagen(entry, enlace):
         bloques_html.extend(c.get("value", "") for c in entry.content)
 
     texto_completo = " ".join(bloques_html)
-    match = re.search(
+    match_img = re.search(
         r'<img[^>]+(?:data-src|data-lazy-src|src)=["\']([^"\']+)["\']',
         texto_completo,
         re.IGNORECASE,
     )
-    if match and match.group(1).startswith("http"):
-        return match.group(1)
+    if match_img and match_img.group(1).startswith("http"):
+        return match_img.group(1)
 
+    # 3. Intentar obtener og:image de enlaces externos dentro del texto del anuncio
+    urls_en_texto = re.findall(r"https?://[^\s\"'<>)\]]+", texto_completo)
+    for u in urls_en_texto:
+        if "steamcommunity.com" in u or "steampowered.com" in u:
+            continue
+        og = buscar_og_image_en_url(u)
+        if og:
+            return og
+
+    # 4. Respaldo final en el enlace principal de la entrada
     if enlace:
-        try:
-            resp = requests.get(enlace, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-            og_match = re.search(
-                r'<meta[^>]+(?:property|name)=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
-                resp.text,
-                re.IGNORECASE,
-            )
-            if not og_match:
-                og_match = re.search(
-                    r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+(?:property|name)=["\']og:image["\']',
-                    resp.text,
-                    re.IGNORECASE,
-                )
-            if og_match and og_match.group(1).startswith("http"):
-                return og_match.group(1)
-        except Exception:
-            pass
+        og_principal = buscar_og_image_en_url(enlace)
+        if og_principal:
+            return og_principal
 
     return None
 
@@ -170,8 +240,11 @@ def main():
 
     historial = cargar_lista_json(HISTORIAL_FILE)
     log_envios = cargar_lista_json(LOG_FILE)
+    rotacion_state = cargar_dict_json(ROTACION_FILE)
+
     cambios_historial = False
     cambios_log = False
+    cambios_rotacion = [False]
 
     headers = {
         "Authorization": f"Bot {bot_token}",
@@ -217,7 +290,7 @@ def main():
             enlace = extraer_enlace_juego(entry, bloque_raw)
             titulo = extraer_titulo_limpio(entry.get("title"), enlace)
             resumen = limpiar_html(bloque_raw)
-            imagen = obtener_imagen(entry, enlace)
+            imagen = obtener_imagen(entry, enlace, feed_cfg, rotacion_state, cambios_rotacion)
             autor = obtener_autor(entry, feed_cfg, bloque_raw)
             fecha_texto = obtener_fecha_texto(entry)
             base_pie = str(feed_cfg.get("pie_pagina") or "Publicado en Juego Hispano").strip()
@@ -270,6 +343,8 @@ def main():
         guardar_lista_json(HISTORIAL_FILE, historial[-1000:])
     if cambios_log:
         guardar_lista_json(LOG_FILE, log_envios[-2000:])
+    if cambios_rotacion[0]:
+        guardar_dict_json(ROTACION_FILE, rotacion_state)
 
 
 if __name__ == "__main__":
