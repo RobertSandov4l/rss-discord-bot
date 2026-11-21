@@ -158,6 +158,32 @@ def extraer_enlace_juego(entry, texto_html):
     return enlace
 
 
+def extraer_enlace_resena(entry, texto_html, enlace_juego=""):
+    link_entry = (entry.get("link") or "").strip()
+    if link_entry.startswith("http") and "store.steampowered.com/app/" not in link_entry:
+        return link_entry
+
+    urls = re.findall(r"https?://[^\s\"'<>)\]]+", texto_html or "")
+    for u in urls:
+        if any(
+            pat in u.lower()
+            for pat in (
+                "steamcommunity.com/groups/",
+                "steamcommunity.com/id/",
+                "steamcommunity.com/profiles/",
+                "store.steampowered.com/curator/",
+                "juegohispano.com",
+            )
+        ):
+            return u
+
+    if link_entry.startswith("http"):
+        return link_entry
+    if enlace_juego and enlace_juego.startswith("http"):
+        return enlace_juego
+    return ""
+
+
 def extraer_titulo_limpio(titulo_raw, enlace):
     titulo = (titulo_raw or "").strip()
     if not titulo or titulo.lower() == "featured":
@@ -174,7 +200,6 @@ def deduplicar_texto_repetido(texto):
     if not limpio:
         return ""
 
-    # Si el texto completo es dos repeticiones exactas o casi exactas pegadas
     mitad = len(limpio) // 2
     for delta in range(-25, 26):
         corte = mitad + delta
@@ -185,15 +210,19 @@ def deduplicar_texto_repetido(texto):
                 limpio = limpio[:corte].strip()
                 break
 
-    # Elimina oraciones o segmentos repetidos consecutivos
-    segmentos = [s.strip() for s in re.split(r"(?<=[.!?])\s+", limpio) if s.strip()]
+    segmentos = [
+        s.strip() for s in re.split(r"(?<=[.!?])\s+", limpio) if s.strip()
+    ]
     resultado = []
     claves_vistas = set()
     for seg in segmentos:
         clave = re.sub(r"[^a-z0-9áéíóúñ]+", "", seg.lower())
         if len(clave) >= 15 and clave in claves_vistas:
             continue
-        if resultado and re.sub(r"[^a-z0-9áéíóúñ]+", "", resultado[-1].lower()) == clave:
+        if (
+            resultado
+            and re.sub(r"[^a-z0-9áéíóúñ]+", "", resultado[-1].lower()) == clave
+        ):
             continue
         resultado.append(seg)
         if len(clave) >= 15:
@@ -202,7 +231,7 @@ def deduplicar_texto_repetido(texto):
     return " ".join(resultado).strip()
 
 
-def limpiar_html(texto):
+def limpiar_html(texto, url_resena="", etiqueta_enlace="Juego Hispano"):
     raw = texto or ""
 
     # Convierte etiquetas <a href="URL">texto</a> a enlaces Markdown [texto](URL)
@@ -246,6 +275,25 @@ def limpiar_html(texto):
             limpio = limpio[: match_jh_texto.end()]
 
     limpio = deduplicar_texto_repetido(limpio)
+
+    # Si el texto no tiene ya el enlace de Juego Hispano y contamos con url_resena, lo agregamos al final
+    etiqueta = (etiqueta_enlace or "Juego Hispano").strip()
+    if url_resena and url_resena.startswith("http"):
+        if not re.search(
+            rf"\[{re.escape(etiqueta)}\]\(https?://[^\s)]+\)",
+            limpio,
+            flags=re.IGNORECASE,
+        ):
+            limpio = re.sub(
+                rf"\s*\b{re.escape(etiqueta)}\b\s*$",
+                "",
+                limpio,
+                flags=re.IGNORECASE,
+            ).strip()
+            sufijo = f" [{etiqueta}]({url_resena})"
+            max_base = max(0, 600 - len(sufijo))
+            limpio = f"{limpio[:max_base].rstrip()}{sufijo}"
+
     return limpio[:600]
 
 
@@ -642,8 +690,13 @@ def main():
             ])
 
             enlace = extraer_enlace_juego(entry, bloque_raw)
+            url_resena = extraer_enlace_resena(entry, bloque_raw, enlace)
             titulo = extraer_titulo_limpio(entry.get("title"), enlace)
-            resumen = limpiar_html(bloque_raw)
+            resumen = limpiar_html(
+                bloque_raw,
+                url_resena=url_resena,
+                etiqueta_enlace=feed_cfg.get("etiqueta_enlace") or "Juego Hispano",
+            )
             imagen = obtener_imagen(
                 entry,
                 enlace,
