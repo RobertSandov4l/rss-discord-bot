@@ -1,21 +1,5 @@
 [
-  {
-    "nombre": "Reseñas - Comunidad en español",
-    "activo": false,
-    "rss_url": "https://morss.it/https://store.steampowered.com/curator/9753302-Comunidad-en-espa%C3%B1ol/",
-    "channel_id": "1440370890368876595",
-    "color": "#6e40e0",
-    "mencion": "",
-    "autor": "",
-    "pie_pagina": "Publicado en Juego Hispano",
-    "pie_icono": "https://i.imgur.com/2osEkLR.png",
-    "buscar_imagen_juego": true,
-    "rotar_en_fallback": true,
-    "imagenes_aleatorias": true,
-    "imagenes": [],
-    "imagen_defecto": "https://i.imgur.com/bBgeQQs.jpeg"
-  },
-  {
+   {
     "nombre": "Reseñas Curator Comuesp",
     "activo": true,
     "rss_url": "https://robertsandov4l.github.io/steam-curator-rss/feed_9753302.xml",
