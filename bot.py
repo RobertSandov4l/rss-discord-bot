@@ -30,6 +30,18 @@ def guardar_lista_json(ruta, datos):
         json.dump(datos, f, indent=2, ensure_ascii=False)
 
 
+def parsear_color(valor_color, defecto=7225568):
+    if isinstance(valor_color, int):
+        return valor_color
+    if isinstance(valor_color, str):
+        limpio = valor_color.strip().lstrip("#")
+        if re.fullmatch(r"[0-9a-fA-F]{6}", limpio):
+            return int(limpio, 16)
+        if limpio.isdigit():
+            return int(limpio)
+    return defecto
+
+
 def extraer_enlace_juego(entry, texto_html):
     enlace = (entry.get("link") or "").strip()
     if "store.steampowered.com/app/" in enlace:
@@ -210,13 +222,19 @@ def main():
             fecha_texto = obtener_fecha_texto(entry)
             base_pie = str(feed_cfg.get("pie_pagina") or "Publicado en Juego Hispano").strip()
             pie_texto = f"{base_pie} • {fecha_texto}"[:2048]
+            color_embed = parsear_color(feed_cfg.get("color"), defecto=7225568)
+            pie_icono = (feed_cfg.get("pie_icono") or "https://i.imgur.com/2osEkLR.png").strip()
+
+            footer_obj = {"text": pie_texto}
+            if pie_icono:
+                footer_obj["icon_url"] = pie_icono
 
             embed = {
                 "title": titulo,
                 "url": enlace,
                 "description": resumen,
-                "color": feed_cfg.get("color", 3447003),
-                "footer": {"text": pie_texto},
+                "color": color_embed,
+                "footer": footer_obj,
             }
             if autor:
                 embed["author"] = {"name": autor}
