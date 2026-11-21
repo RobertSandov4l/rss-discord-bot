@@ -27,13 +27,13 @@ jobs:
           SEMILLA_SIN_ENVIAR: ${{ vars.SEMILLA_SIN_ENVIAR || 'false' }}
         run: python bot.py
 
-      - name: Guardar historial y log
+      - name: Guardar historial, log y rotacion
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add historial.json log_envios.json || true
+          git add historial.json log_envios.json rotacion_imagenes.json || true
           if ! git diff --quiet || ! git diff --staged --quiet; then
-            git commit -m "Actualizar historial y log"
+            git commit -m "Actualizar historial, log y rotacion"
             git pull --rebase origin main || true
             git push
           fi
