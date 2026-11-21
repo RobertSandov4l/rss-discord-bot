@@ -31,7 +31,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add historial.json log_envios.json rotacion_imagenes.json || true
+          git add historial.json log_envios.json rotacion_imagenes.json logs/ || true
           if ! git diff --quiet || ! git diff --staged --quiet; then
             git commit -m "Actualizar historial, log y rotacion"
             git pull --rebase origin main || true
