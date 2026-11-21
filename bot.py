@@ -3,12 +3,17 @@ import json
 import os
 import re
 import time
+import urllib.parse
 import feedparser
 import requests
 
 HISTORIAL_FILE = "historial.json"
 LOG_FILE = "log_envios.json"
 ROTACION_FILE = "rotacion_imagenes.json"
+
+HEADERS_WEB = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+}
 
 
 def cargar_lista_json(ruta):
@@ -130,13 +135,87 @@ def obtener_fecha_texto(entry):
     return datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
 
 
+def url_imagen_accesible(url):
+    if not url or not isinstance(url, str):
+        return False
+    url = url.strip()
+    if not (url.startswith("http://") or url.startswith("https://")):
+        return False
+    try:
+        resp = requests.head(url, headers=HEADERS_WEB, timeout=6, allow_redirects=True)
+        if resp.status_code == 200:
+            ctype = (resp.headers.get("Content-Type") or "").lower()
+            if "image" in ctype or not ctype:
+                return True
+        if resp.status_code in (403, 405):
+            rget = requests.get(
+                url, headers=HEADERS_WEB, timeout=8, stream=True, allow_redirects=True
+            )
+            ok = rget.status_code == 200 and "image" in (
+                rget.headers.get("Content-Type") or ""
+            ).lower()
+            rget.close()
+            return ok
+    except Exception:
+        return False
+    return False
+
+
+def extraer_posible_juego(titulo, descripcion_limpia):
+    base = f"{titulo or ''} {descripcion_limpia or ''}".strip()
+    # Elimina URLs y prefijos comunes de ofertas/anuncios
+    base = re.sub(r"https?://\S+", " ", base)
+    base = re.sub(
+        r"\b(?:probable\s+)?(?:fallo\s+de\s+precio|error\s+de\s+precio|oferta|descuento|gratis|bundle|pack|clave|key)s?\s*:?",
+        " ",
+        base,
+        flags=re.IGNORECASE,
+    )
+    # Corta a partir de "para Steam", "en Humble", "en Epic", "al XX%", etc.
+    base = re.split(
+        r"\b(?:para\s+steam|en\s+steam|en\s+humble|en\s+epic|en\s+gog|en\s+fanatical|al\s+\d+\s*%|con\s+\d+\s*%)\b",
+        base,
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0]
+    candidato = re.sub(r"\s+", " ", base).strip(" :-–—|.,")
+    if len(candidato) >= 3:
+        return candidato[:80]
+    return ""
+
+
+def buscar_imagen_en_steam(consulta_juego):
+    if not consulta_juego:
+        return None
+    try:
+        q = urllib.parse.quote(consulta_juego)
+        url = f"https://store.steampowered.com/api/storesearch/?term={q}&l=spanish&cc=US"
+        resp = requests.get(url, headers=HEADERS_WEB, timeout=8)
+        if not resp.ok:
+            return None
+        data = resp.json()
+        items = data.get("items") or []
+        if items:
+            appid = items[0].get("id")
+            if appid:
+                header_url = f"https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{appid}/header.jpg"
+                if url_imagen_accesible(header_url):
+                    return header_url
+            tiny = items[0].get("tiny_image")
+            if tiny and url_imagen_accesible(tiny):
+                return tiny
+    except Exception:
+        pass
+    return None
+
+
 def buscar_og_image_en_url(url_objetivo):
     if not url_objetivo or not url_objetivo.startswith("http"):
         return None
     try:
         resp = requests.get(
             url_objetivo,
-            headers={"User-Agent": "Mozilla/5.0"},
+            headers=HEADERS_WEB,
             timeout=8,
             allow_redirects=True,
         )
@@ -153,8 +232,10 @@ def buscar_og_image_en_url(url_objetivo):
                 resp.text,
                 re.IGNORECASE,
             )
-        if og_match and og_match.group(1).startswith("http"):
-            return og_match.group(1).strip()
+        if og_match:
+            candidata = og_match.group(1).strip()
+            if url_imagen_accesible(candidata):
+                return candidata
     except Exception:
         pass
     return None
@@ -172,32 +253,35 @@ def obtener_imagen_rotativa(feed_cfg, rotacion_state):
     idx_actual = int(rotacion_state.get(clave_feed, 0)) % len(urls_validas)
     imagen_elegida = urls_validas[idx_actual]
     rotacion_state[clave_feed] = (idx_actual + 1) % len(urls_validas)
-    return imagen_elegida
+    if url_imagen_accesible(imagen_elegida):
+        return imagen_elegida
+    return None
 
 
-def obtener_imagen(entry, enlace, feed_cfg, rotacion_state, cambios_rotacion_ref):
-    # 1. Si el feed tiene lista de imagenes rotativas y esta activada (por defecto True si existe la lista)
-    usar_rotacion = feed_cfg.get("rotar_imagenes", True)
+def obtener_imagen(entry, enlace, feed_cfg, rotacion_state, cambios_rotacion_ref, titulo_limpio="", resumen_limpio=""):
+    # 1. Lista rotativa manual si esta configurada y activa
+    usar_rotacion = feed_cfg.get("rotar_imagenes", False)
     if usar_rotacion and isinstance(feed_cfg.get("imagenes"), list) and feed_cfg["imagenes"]:
         img_rot = obtener_imagen_rotativa(feed_cfg, rotacion_state)
         if img_rot:
             cambios_rotacion_ref[0] = True
             return img_rot
 
-    # 2. Imagen directa en campos multimedia del RSS
+    # 2. Imagen directa en campos multimedia o HTML del RSS
     if "media_content" in entry and entry.media_content:
         url = entry.media_content[0].get("url")
-        if url:
+        if url and url_imagen_accesible(url):
             return url
     if "media_thumbnail" in entry and entry.media_thumbnail:
         url = entry.media_thumbnail[0].get("url")
-        if url:
+        if url and url_imagen_accesible(url):
             return url
 
     for coleccion in (entry.get("enclosures", []), entry.get("links", [])):
         for item in coleccion:
             if item.get("type", "").startswith("image/") and item.get("href"):
-                return item.get("href")
+                if url_imagen_accesible(item["href"]):
+                    return item["href"]
 
     bloques_html = [
         entry.get("summary", ""),
@@ -213,19 +297,27 @@ def obtener_imagen(entry, enlace, feed_cfg, rotacion_state, cambios_rotacion_ref
         re.IGNORECASE,
     )
     if match_img and match_img.group(1).startswith("http"):
-        return match_img.group(1)
+        if url_imagen_accesible(match_img.group(1)):
+            return match_img.group(1)
 
-    # 3. Intentar obtener og:image de enlaces externos dentro del texto del anuncio
+    # 3. Buscar portada del juego en Steam segun lo mencionado en el titulo/descripcion
+    if feed_cfg.get("buscar_imagen_juego", True):
+        posible_juego = extraer_posible_juego(titulo_limpio, resumen_limpio)
+        img_steam = buscar_imagen_en_steam(posible_juego)
+        if img_steam:
+            return img_steam
+
+    # 4. Intentar obtener og:image de enlaces externos mencionados en el texto
     urls_en_texto = re.findall(r"https?://[^\s\"'<>)\]]+", texto_completo)
     for u in urls_en_texto:
-        if "steamcommunity.com" in u or "steampowered.com" in u:
+        if "steamcommunity.com" in u:
             continue
         og = buscar_og_image_en_url(u)
         if og:
             return og
 
-    # 4. Respaldo final en el enlace principal de la entrada
-    if enlace:
+    # 5. Respaldo final en el enlace principal
+    if enlace and "steamcommunity.com/groups/" not in enlace:
         og_principal = buscar_og_image_en_url(enlace)
         if og_principal:
             return og_principal
@@ -290,7 +382,15 @@ def main():
             enlace = extraer_enlace_juego(entry, bloque_raw)
             titulo = extraer_titulo_limpio(entry.get("title"), enlace)
             resumen = limpiar_html(bloque_raw)
-            imagen = obtener_imagen(entry, enlace, feed_cfg, rotacion_state, cambios_rotacion)
+            imagen = obtener_imagen(
+                entry,
+                enlace,
+                feed_cfg,
+                rotacion_state,
+                cambios_rotacion,
+                titulo_limpio=titulo,
+                resumen_limpio=resumen,
+            )
             autor = obtener_autor(entry, feed_cfg, bloque_raw)
             fecha_texto = obtener_fecha_texto(entry)
             base_pie = str(feed_cfg.get("pie_pagina") or "Publicado en Juego Hispano").strip()
