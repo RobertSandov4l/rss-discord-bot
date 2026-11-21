@@ -59,6 +59,53 @@ def ruta_log_feed(nombre_feed):
     return os.path.join(LOGS_DIR, f"{slug_feed(nombre_feed)}.json")
 
 
+def normalizar_url_limpia(url):
+    u = (url or "").strip()
+    if not u:
+        return ""
+    u = u.split("#", 1)[0].split("?", 1)[0].rstrip("/").lower()
+    return u
+
+
+def extraer_appid_steam(texto):
+    match = re.search(
+        r"store\.steampowered\.com/app/(\d+)", texto or "", flags=re.IGNORECASE
+    )
+    if match:
+        return match.group(1)
+    match_uid = re.search(
+        r"store-steampowered-com-app-(\d+)", texto or "", flags=re.IGNORECASE
+    )
+    if match_uid:
+        return match_uid.group(1)
+    return ""
+
+
+def obtener_claves_entrada(entry, bloque_raw=""):
+    uid = (entry.get("id") or entry.get("link") or "").strip()
+    link = (entry.get("link") or "").strip()
+    claves = []
+
+    if uid:
+        claves.append(uid)
+
+    url_limpia = normalizar_url_limpia(link)
+    if url_limpia and url_limpia not in claves:
+        claves.append(url_limpia)
+
+    appid = extraer_appid_steam(f"{uid} {link} {bloque_raw}")
+    if appid:
+        clave_app = f"steam_app:{appid}"
+        if clave_app not in claves:
+            claves.append(clave_app)
+
+    return claves
+
+
+def ya_registrado(claves_entrada, historial_set):
+    return any(c in historial_set for c in claves_entrada)
+
+
 def cargar_dict_json(ruta):
     if os.path.exists(ruta):
         try:
@@ -434,7 +481,6 @@ def obtener_imagen(
         if url_imagen_accesible(match_img.group(1)):
             return match_img.group(1)
 
-    # Portada directa si hay enlace de juego en Steam (incluyendo sorteos con link de app)
     img_appid = buscar_imagen_por_appid_en_texto(f"{enlace or ''} {texto_completo}")
     if img_appid:
         return img_appid
@@ -489,6 +535,7 @@ def main():
     )
 
     historial = cargar_lista_json(HISTORIAL_FILE)
+    historial_set = set(historial)
     log_envios = cargar_lista_json(LOG_FILE)
     logs_por_feed = {}
     feeds_con_log_nuevo = set()
@@ -519,22 +566,29 @@ def main():
             )
             continue
 
-        entradas_nuevas = [
-            e
-            for e in reversed(parsed.entries[:8])
-            if (e.get("id") or e.get("link"))
-            and (e.get("id") or e.get("link")) not in historial
-        ]
+        entradas_nuevas = []
+        for e in reversed(parsed.entries[:8]):
+            bloque_previo = " ".join([
+                e.get("summary", ""),
+                e.get("description", ""),
+                " ".join(c.get("value", "") for c in e.get("content", [])),
+            ])
+            claves = obtener_claves_entrada(e, bloque_previo)
+            if claves and not ya_registrado(claves, historial_set):
+                entradas_nuevas.append((e, claves))
 
         if not entradas_nuevas:
             print(f"Sin novedades en {feed_cfg.get('nombre', 'Feed')}.")
             continue
 
-        for entry in entradas_nuevas:
-            uid = entry.get("id") or entry.get("link")
+        for entry, claves in entradas_nuevas:
+            uid = entry.get("id") or entry.get("link") or claves[0]
 
             if solo_semilla:
-                historial.append(uid)
+                for c in claves:
+                    if c not in historial_set:
+                        historial.append(c)
+                        historial_set.add(c)
                 cambios_historial = True
                 print(f"[SEMILLA] Registrado sin enviar: {uid}")
                 continue
@@ -600,7 +654,10 @@ def main():
                 url_api, headers=headers, json=payload, timeout=15
             )
             if resp.status_code in (200, 204):
-                historial.append(uid)
+                for c in claves:
+                    if c not in historial_set:
+                        historial.append(c)
+                        historial_set.add(c)
                 cambios_historial = True
 
                 nombre_feed_actual = feed_cfg.get("nombre", "")
@@ -627,7 +684,7 @@ def main():
                 print(f"Error al publicar ({resp.status_code}): {resp.text}")
 
     if cambios_historial:
-        guardar_lista_json(HISTORIAL_FILE, historial[-1000:])
+        guardar_lista_json(HISTORIAL_FILE, historial[-1500:])
     if cambios_log:
         guardar_lista_json(LOG_FILE, log_envios[-2000:])
     for ruta_individual in feeds_con_log_nuevo:
