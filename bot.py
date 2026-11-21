@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import json
 import os
 import re
@@ -36,12 +37,11 @@ def extraer_titulo_limpio(titulo_raw, enlace):
         match_slug = re.search(r"store\.steampowered\.com/app/\d+/([^/?#]+)", enlace or "")
         if match_slug:
             return match_slug.group(1).replace("_", " ").replace("-", " ")[:256]
-    return (titulo or "Nueva reseña")[:256]
+    return (titulo or "Nueva publicación")[:256]
 
 
 def limpiar_html(texto):
     limpio = re.sub(r"<[^>]+>", " ", texto or "")
-    # Elimina precios como 7,49€, Live24,99€ o $9.99
     limpio = re.sub(
         r"\b(?:Live)?\d+[.,]\d{2}\s*€|\$\s*\d+[.,]\d{2}",
         " ",
@@ -49,6 +49,36 @@ def limpiar_html(texto):
         flags=re.IGNORECASE,
     )
     return " ".join(limpio.split())[:350]
+
+
+def obtener_autor(entry, feed_cfg, texto_plano=""):
+    if feed_cfg.get("autor"):
+        return str(feed_cfg["autor"]).strip()[:256]
+    if entry.get("author"):
+        return str(entry.get("author")).strip()[:256]
+    if entry.get("dc_creator"):
+        return str(entry.get("dc_creator")).strip()[:256]
+    if entry.get("authors") and isinstance(entry.get("authors"), list):
+        nombre = entry["authors"][0].get("name")
+        if nombre:
+            return str(nombre).strip()[:256]
+
+    match_autor = re.search(r"\b(?:Por|Autor|By)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ0-9_.-]{2,30})", texto_plano)
+    if match_autor:
+        return match_autor.group(1).strip()[:256]
+
+    return ""
+
+
+def obtener_fecha_texto(entry):
+    tiempo = entry.get("published_parsed") or entry.get("updated_parsed")
+    if tiempo:
+        try:
+            dt = datetime(*tiempo[:6], tzinfo=timezone.utc)
+            return dt.strftime("%d/%m/%Y %H:%M UTC")
+        except Exception:
+            pass
+    return datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
 
 
 def obtener_imagen(entry, enlace):
@@ -116,50 +146,66 @@ def main():
     }
 
     for feed_cfg in feeds:
+        if not feed_cfg.get("activo", True):
+            print(f"Feed desactivado (activo=false): {feed_cfg.get('nombre', 'Sin nombre')}")
+            continue
+
         parsed = feedparser.parse(feed_cfg["rss_url"])
-        entradas = list(reversed(parsed.entries[:5]))
+        if not parsed.entries:
+            print(f"Sin entradas en el feed: {feed_cfg.get('nombre', 'Sin nombre')}")
+            continue
 
-        for entry in entradas:
-            uid = entry.get("id") or entry.get("link")
-            if not uid or uid in historial:
-                continue
+        # Solo revisa la entrada más reciente
+        entry = parsed.entries[0]
+        uid = entry.get("id") or entry.get("link")
+        if not uid:
+            continue
 
-            bloque_raw = " ".join([
-                entry.get("summary", ""),
-                entry.get("description", ""),
-                " ".join(c.get("value", "") for c in entry.get("content", [])),
-            ])
+        if uid in historial:
+            print(f"Sin novedades en {feed_cfg.get('nombre', 'Feed')} (última ya publicada).")
+            continue
 
-            enlace = extraer_enlace_juego(entry, bloque_raw)
-            titulo = extraer_titulo_limpio(entry.get("title"), enlace)
-            resumen = limpiar_html(bloque_raw)
-            imagen = obtener_imagen(entry, enlace)
+        bloque_raw = " ".join([
+            entry.get("summary", ""),
+            entry.get("description", ""),
+            " ".join(c.get("value", "") for c in entry.get("content", [])),
+        ])
 
-            print("DEBUG TITULO:", titulo)
-            print("DEBUG ENLACE:", enlace)
-            print("DEBUG RESUMEN:", resumen)
-            print("DEBUG IMAGEN:", imagen)
+        enlace = extraer_enlace_juego(entry, bloque_raw)
+        titulo = extraer_titulo_limpio(entry.get("title"), enlace)
+        resumen = limpiar_html(bloque_raw)
+        imagen = obtener_imagen(entry, enlace)
+        autor = obtener_autor(entry, feed_cfg, bloque_raw)
+        fecha_texto = obtener_fecha_texto(entry)
+        base_pie = str(feed_cfg.get("pie_pagina") or "Publicado en Juego Hispano").strip()
+        pie_texto = f"{base_pie} • {fecha_texto}"[:2048]
 
-            embed = {
-                "title": titulo,
-                "url": enlace,
-                "description": resumen,
-                "color": feed_cfg.get("color", 3447003),
-            }
-            if imagen:
-                embed["image"] = {"url": imagen}
+        embed = {
+            "title": titulo,
+            "url": enlace,
+            "description": resumen,
+            "color": feed_cfg.get("color", 3447003),
+            "footer": {"text": pie_texto},
+        }
+        if autor:
+            embed["author"] = {"name": autor}
+        if imagen:
+            embed["image"] = {"url": imagen}
 
-            payload = {
-                "content": feed_cfg.get("mencion", ""),
-                "embeds": [embed],
-            }
+        payload = {
+            "content": feed_cfg.get("mencion", ""),
+            "embeds": [embed],
+        }
 
-            url_api = f"https://discord.com/api/v10/channels/{feed_cfg['channel_id']}/messages"
-            resp = requests.post(url_api, headers=headers, json=payload, timeout=15)
-            if resp.status_code in (200, 204):
-                historial.append(uid)
-                cambios = True
-                time.sleep(1.5)
+        time.sleep(2)
+        url_api = f"https://discord.com/api/v10/channels/{feed_cfg['channel_id']}/messages"
+        resp = requests.post(url_api, headers=headers, json=payload, timeout=15)
+        if resp.status_code in (200, 204):
+            historial.append(uid)
+            cambios = True
+            print(f"Publicado: {titulo}")
+        else:
+            print(f"Error al publicar ({resp.status_code}): {resp.text}")
 
     if cambios:
         with open(HISTORIAL_FILE, "w", encoding="utf-8") as f:
