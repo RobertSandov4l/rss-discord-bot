@@ -7,13 +7,27 @@ import feedparser
 import requests
 
 HISTORIAL_FILE = "historial.json"
+LOG_FILE = "log_envios.json"
 
 
-def cargar_historial():
-    if os.path.exists(HISTORIAL_FILE):
-        with open(HISTORIAL_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+def cargar_lista_json(ruta):
+    if os.path.exists(ruta):
+        try:
+            with open(ruta, "r", encoding="utf-8") as f:
+                contenido = f.read().strip()
+                if not contenido:
+                    return []
+                datos = json.loads(contenido)
+                return datos if isinstance(datos, list) else []
+        except Exception as e:
+            print(f"Aviso al leer {ruta}: {e}. Se iniciara lista vacia.")
+            return []
     return []
+
+
+def guardar_lista_json(ruta, datos):
+    with open(ruta, "w", encoding="utf-8") as f:
+        json.dump(datos, f, indent=2, ensure_ascii=False)
 
 
 def extraer_enlace_juego(entry, texto_html):
@@ -37,7 +51,7 @@ def extraer_titulo_limpio(titulo_raw, enlace):
         match_slug = re.search(r"store\.steampowered\.com/app/\d+/([^/?#]+)", enlace or "")
         if match_slug:
             return match_slug.group(1).replace("_", " ").replace("-", " ")[:256]
-    return (titulo or "Nueva publicación")[:256]
+    return (titulo or "Nueva publicacion")[:256]
 
 
 def limpiar_html(texto):
@@ -63,7 +77,10 @@ def obtener_autor(entry, feed_cfg, texto_plano=""):
         if nombre:
             return str(nombre).strip()[:256]
 
-    match_autor = re.search(r"\b(?:Por|Autor|By)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ0-9_.-]{2,30})", texto_plano)
+    match_autor = re.search(
+        r"\b(?:Por|Autor|By)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ0-9_.-]{2,30})",
+        texto_plano,
+    )
     if match_autor:
         return match_autor.group(1).strip()[:256]
 
@@ -137,8 +154,12 @@ def obtener_imagen(entry, enlace):
 def main():
     bot_token = os.environ["DISCORD_BOT_TOKEN"]
     feeds = json.loads(os.environ["FEEDS_JSON"])
-    historial = cargar_historial()
-    cambios = False
+    solo_semilla = os.environ.get("SEMILLA_SIN_ENVIAR", "false").lower() == "true"
+
+    historial = cargar_lista_json(HISTORIAL_FILE)
+    log_envios = cargar_lista_json(LOG_FILE)
+    cambios_historial = False
+    cambios_log = False
 
     headers = {
         "Authorization": f"Bot {bot_token}",
@@ -168,6 +189,12 @@ def main():
 
         for entry in entradas_nuevas:
             uid = entry.get("id") or entry.get("link")
+
+            if solo_semilla:
+                historial.append(uid)
+                cambios_historial = True
+                print(f"[SEMILLA] Registrado sin enviar: {uid}")
+                continue
 
             bloque_raw = " ".join([
                 entry.get("summary", ""),
@@ -206,14 +233,25 @@ def main():
             resp = requests.post(url_api, headers=headers, json=payload, timeout=15)
             if resp.status_code in (200, 204):
                 historial.append(uid)
-                cambios = True
+                cambios_historial = True
+
+                log_envios.append({
+                    "fecha_envio_utc": datetime.now(timezone.utc).isoformat(),
+                    "feed": feed_cfg.get("nombre", ""),
+                    "channel_id": str(feed_cfg.get("channel_id", "")),
+                    "titulo": titulo,
+                    "enlace": enlace,
+                    "uid": uid,
+                })
+                cambios_log = True
                 print(f"Publicado: {titulo}")
             else:
                 print(f"Error al publicar ({resp.status_code}): {resp.text}")
 
-    if cambios:
-        with open(HISTORIAL_FILE, "w", encoding="utf-8") as f:
-            json.dump(historial[-1000:], f, indent=2)
+    if cambios_historial:
+        guardar_lista_json(HISTORIAL_FILE, historial[-1000:])
+    if cambios_log:
+        guardar_lista_json(LOG_FILE, log_envios[-2000:])
 
 
 if __name__ == "__main__":
