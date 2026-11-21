@@ -155,57 +155,61 @@ def main():
             print(f"Sin entradas en el feed: {feed_cfg.get('nombre', 'Sin nombre')}")
             continue
 
-        # Solo revisa la entrada más reciente
-        entry = parsed.entries[0]
-        uid = entry.get("id") or entry.get("link")
-        if not uid:
+        entradas_nuevas = [
+            e
+            for e in reversed(parsed.entries[:8])
+            if (e.get("id") or e.get("link"))
+            and (e.get("id") or e.get("link")) not in historial
+        ]
+
+        if not entradas_nuevas:
+            print(f"Sin novedades en {feed_cfg.get('nombre', 'Feed')}.")
             continue
 
-        if uid in historial:
-            print(f"Sin novedades en {feed_cfg.get('nombre', 'Feed')} (última ya publicada).")
-            continue
+        for entry in entradas_nuevas:
+            uid = entry.get("id") or entry.get("link")
 
-        bloque_raw = " ".join([
-            entry.get("summary", ""),
-            entry.get("description", ""),
-            " ".join(c.get("value", "") for c in entry.get("content", [])),
-        ])
+            bloque_raw = " ".join([
+                entry.get("summary", ""),
+                entry.get("description", ""),
+                " ".join(c.get("value", "") for c in entry.get("content", [])),
+            ])
 
-        enlace = extraer_enlace_juego(entry, bloque_raw)
-        titulo = extraer_titulo_limpio(entry.get("title"), enlace)
-        resumen = limpiar_html(bloque_raw)
-        imagen = obtener_imagen(entry, enlace)
-        autor = obtener_autor(entry, feed_cfg, bloque_raw)
-        fecha_texto = obtener_fecha_texto(entry)
-        base_pie = str(feed_cfg.get("pie_pagina") or "Publicado en Juego Hispano").strip()
-        pie_texto = f"{base_pie} • {fecha_texto}"[:2048]
+            enlace = extraer_enlace_juego(entry, bloque_raw)
+            titulo = extraer_titulo_limpio(entry.get("title"), enlace)
+            resumen = limpiar_html(bloque_raw)
+            imagen = obtener_imagen(entry, enlace)
+            autor = obtener_autor(entry, feed_cfg, bloque_raw)
+            fecha_texto = obtener_fecha_texto(entry)
+            base_pie = str(feed_cfg.get("pie_pagina") or "Publicado en Juego Hispano").strip()
+            pie_texto = f"{base_pie} • {fecha_texto}"[:2048]
 
-        embed = {
-            "title": titulo,
-            "url": enlace,
-            "description": resumen,
-            "color": feed_cfg.get("color", 3447003),
-            "footer": {"text": pie_texto},
-        }
-        if autor:
-            embed["author"] = {"name": autor}
-        if imagen:
-            embed["image"] = {"url": imagen}
+            embed = {
+                "title": titulo,
+                "url": enlace,
+                "description": resumen,
+                "color": feed_cfg.get("color", 3447003),
+                "footer": {"text": pie_texto},
+            }
+            if autor:
+                embed["author"] = {"name": autor}
+            if imagen:
+                embed["image"] = {"url": imagen}
 
-        payload = {
-            "content": feed_cfg.get("mencion", ""),
-            "embeds": [embed],
-        }
+            payload = {
+                "content": feed_cfg.get("mencion", ""),
+                "embeds": [embed],
+            }
 
-        time.sleep(2)
-        url_api = f"https://discord.com/api/v10/channels/{feed_cfg['channel_id']}/messages"
-        resp = requests.post(url_api, headers=headers, json=payload, timeout=15)
-        if resp.status_code in (200, 204):
-            historial.append(uid)
-            cambios = True
-            print(f"Publicado: {titulo}")
-        else:
-            print(f"Error al publicar ({resp.status_code}): {resp.text}")
+            time.sleep(2)
+            url_api = f"https://discord.com/api/v10/channels/{feed_cfg['channel_id']}/messages"
+            resp = requests.post(url_api, headers=headers, json=payload, timeout=15)
+            if resp.status_code in (200, 204):
+                historial.append(uid)
+                cambios = True
+                print(f"Publicado: {titulo}")
+            else:
+                print(f"Error al publicar ({resp.status_code}): {resp.text}")
 
     if cambios:
         with open(HISTORIAL_FILE, "w", encoding="utf-8") as f:
