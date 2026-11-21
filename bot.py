@@ -246,7 +246,12 @@ def deduplicar_texto_repetido(texto):
     return " ".join(resultado).strip()
 
 
-def limpiar_html(texto, url_resena="", etiqueta_enlace="Juego Hispano"):
+def limpiar_html(
+    texto,
+    url_resena="",
+    etiqueta_enlace="Juego Hispano",
+    frase_previa="Leer reseña completa en",
+):
     raw = texto or ""
 
     # Convierte etiquetas <a href="URL">texto</a> a enlaces Markdown [texto](URL)
@@ -291,8 +296,9 @@ def limpiar_html(texto, url_resena="", etiqueta_enlace="Juego Hispano"):
 
     limpio = deduplicar_texto_repetido(limpio)
 
-    # Si contamos con url_resena permitida, agregamos [Juego Hispano](url_resena) al final
+    # Si contamos con url_resena permitida, agregamos punto final + frase + enlace al final
     etiqueta = (etiqueta_enlace or "Juego Hispano").strip()
+    frase = (frase_previa or "Leer reseña completa en").strip()
     if url_resena and url_resena.startswith("http"):
         if not re.search(
             rf"\[{re.escape(etiqueta)}\]\(https?://[^\s)]+\)",
@@ -300,12 +306,14 @@ def limpiar_html(texto, url_resena="", etiqueta_enlace="Juego Hispano"):
             flags=re.IGNORECASE,
         ):
             limpio = re.sub(
-                rf"\s*\b{re.escape(etiqueta)}\b\s*$",
+                rf"(?:\s*\b{re.escape(frase)}\b)?\s*\b{re.escape(etiqueta)}\b\s*$",
                 "",
                 limpio,
                 flags=re.IGNORECASE,
             ).strip()
-            sufijo = f" [{etiqueta}]({url_resena})"
+            if limpio and limpio[-1] not in ".!?":
+                limpio = f"{limpio}."
+            sufijo = f" {frase} [{etiqueta}]({url_resena})"
             max_base = max(0, 600 - len(sufijo))
             limpio = f"{limpio[:max_base].rstrip()}{sufijo}"
 
@@ -404,7 +412,7 @@ def extraer_posible_juego(titulo, descripcion_limpia):
             maxsplit=1,
             flags=re.IGNORECASE,
         )[0]
-        candidato_colon = re.sub(r"\s+", " ", candidato_colon).strip(" :-–—|.,")
+        candidato_colon = re.sub(r"\s+", " ", candidato_colon).strip(" :.-|.,")
         if len(candidato_colon) >= 2:
             return candidato_colon[:80]
 
@@ -422,7 +430,7 @@ def extraer_posible_juego(titulo, descripcion_limpia):
         maxsplit=1,
         flags=re.IGNORECASE,
     )[0]
-    candidato = re.sub(r"\s+", " ", base).strip(" :-–—|.,")
+    candidato = re.sub(r"\s+", " ", base).strip(" :.-|.,")
     if len(candidato) >= 3:
         return candidato[:80]
     return ""
@@ -711,6 +719,7 @@ def main():
                 bloque_raw,
                 url_resena=url_resena,
                 etiqueta_enlace=feed_cfg.get("etiqueta_enlace") or "Juego Hispano",
+                frase_previa=feed_cfg.get("frase_enlace") or "Leer reseña completa en",
             )
             imagen = obtener_imagen(
                 entry,
