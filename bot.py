@@ -15,6 +15,20 @@ LOGS_DIR = "logs"
 ROTACION_FILE = "rotacion_imagenes.json"
 IMAGEN_ULTIMO_RECURSO = "https://i.imgur.com/bBgeQQs.jpeg"
 
+DOMINIOS_RESENA_PERMITIDOS = (
+    "juegohispano.com",
+    "youtube.com",
+    "youtu.be",
+    "m.youtube.com",
+    "steamcommunity.com/id/",
+    "steamcommunity.com/profiles/",
+)
+
+DOMINIOS_RESENA_BLOQUEADOS = (
+    "clickup.com",
+    "store.steampowered.com/app/",
+)
+
 HEADERS_WEB = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -158,29 +172,30 @@ def extraer_enlace_juego(entry, texto_html):
     return enlace
 
 
+def _es_url_resena_valida(url):
+    u = (url or "").strip()
+    if not u.startswith(("http://", "https://")):
+        return False
+    low = u.lower()
+    if any(b in low for b in DOMINIOS_RESENA_BLOQUEADOS):
+        return False
+    return any(p in low for p in DOMINIOS_RESENA_PERMITIDOS)
+
+
 def extraer_enlace_resena(entry, texto_html, enlace_juego=""):
+    comentario = (entry.get("comments") or "").strip()
+    if _es_url_resena_valida(comentario):
+        return comentario
+
     link_entry = (entry.get("link") or "").strip()
-    if link_entry.startswith("http") and "store.steampowered.com/app/" not in link_entry:
+    if _es_url_resena_valida(link_entry):
         return link_entry
 
     urls = re.findall(r"https?://[^\s\"'<>)\]]+", texto_html or "")
     for u in urls:
-        if any(
-            pat in u.lower()
-            for pat in (
-                "steamcommunity.com/groups/",
-                "steamcommunity.com/id/",
-                "steamcommunity.com/profiles/",
-                "store.steampowered.com/curator/",
-                "juegohispano.com",
-            )
-        ):
+        if _es_url_resena_valida(u):
             return u
 
-    if link_entry.startswith("http"):
-        return link_entry
-    if enlace_juego and enlace_juego.startswith("http"):
-        return enlace_juego
     return ""
 
 
@@ -276,7 +291,7 @@ def limpiar_html(texto, url_resena="", etiqueta_enlace="Juego Hispano"):
 
     limpio = deduplicar_texto_repetido(limpio)
 
-    # Si el texto no tiene ya el enlace de Juego Hispano y contamos con url_resena, lo agregamos al final
+    # Si contamos con url_resena permitida, agregamos [Juego Hispano](url_resena) al final
     etiqueta = (etiqueta_enlace or "Juego Hispano").strip()
     if url_resena and url_resena.startswith("http"):
         if not re.search(
