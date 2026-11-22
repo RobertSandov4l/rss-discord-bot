@@ -61,6 +61,41 @@ def guardar_lista_json(ruta, datos):
         json.dump(datos, f, indent=2, ensure_ascii=False)
 
 
+def cargar_historial_agrupado(ruta):
+    if os.path.exists(ruta):
+        try:
+            with open(ruta, "r", encoding="utf-8") as f:
+                contenido = f.read().strip()
+                if not contenido:
+                    return {}
+                datos = json.loads(contenido)
+                if isinstance(datos, dict):
+                    resultado = {}
+                    for k, v in datos.items():
+                        if isinstance(v, list):
+                            resultado[str(k)] = [str(x) for x in v if x]
+                    return resultado
+                if isinstance(datos, list):
+                    limpios = [str(x) for x in datos if x]
+                    return {"Historial previo": limpios} if limpios else {}
+        except Exception as e:
+            print(f"Aviso al leer {ruta}: {e}. Se iniciara historial vacio.")
+            return {}
+    return {}
+
+
+def guardar_historial_agrupado(ruta, historial_dict, max_por_feed=600):
+    carpeta = os.path.dirname(ruta)
+    if carpeta:
+        os.makedirs(carpeta, exist_ok=True)
+    recortado = {}
+    for nombre_feed, lista in historial_dict.items():
+        if isinstance(lista, list):
+            recortado[nombre_feed] = lista[-max_por_feed:]
+    with open(ruta, "w", encoding="utf-8") as f:
+        json.dump(recortado, f, indent=2, ensure_ascii=False)
+
+
 def slug_feed(nombre_feed):
     texto = str(nombre_feed or "feed-sin-nombre").strip().lower()
     normalizado = unicodedata.normalize("NFKD", texto)
@@ -95,31 +130,51 @@ def extraer_appid_steam(texto):
     return ""
 
 
-def obtener_claves_entrada(entry, bloque_raw=""):
+def obtener_clave_principal(entry, bloque_raw=""):
     uid = (entry.get("id") or entry.get("link") or "").strip()
     link = (entry.get("link") or "").strip()
-    titulo = re.sub(r"\s+", " ", (entry.get("title") or "").strip().lower())
-    claves = []
+    appid = extraer_appid_steam(f"{uid} {link} {bloque_raw}")
 
-    if uid:
-        claves.append(uid)
+    if appid:
+        return f"steam_app:{appid}"
 
     url_limpia = normalizar_url_limpia(link)
+    return url_limpia or uid
+
+
+def obtener_claves_equivalentes(entry, bloque_raw=""):
+    uid = (entry.get("id") or entry.get("link") or "").strip()
+    link = (entry.get("link") or "").strip()
+    url_limpia = normalizar_url_limpia(link)
+    appid = extraer_appid_steam(f"{uid} {link} {bloque_raw}")
+
+    claves = []
+    if appid:
+        claves.append(f"steam_app:{appid}")
     if url_limpia and url_limpia not in claves:
         claves.append(url_limpia)
-
-    appid = extraer_appid_steam(f"{uid} {link} {bloque_raw}")
-    if appid:
-        clave_app = f"steam_app:{appid}"
-        if clave_app not in claves:
-            claves.append(clave_app)
-
-    if titulo and (url_limpia or appid):
-        clave_titulo_ref = f"item:{titulo}|{appid or url_limpia}"
-        if clave_titulo_ref not in claves:
-            claves.append(clave_titulo_ref)
-
+    if uid and uid not in claves:
+        claves.append(uid)
     return claves
+
+
+def construir_set_feed(lista_feed, historial_previo=None):
+    vistos = set()
+    fuentes = list(lista_feed or []) + list(historial_previo or [])
+    for item in fuentes:
+        s = str(item or "").strip()
+        if not s:
+            continue
+        if "::" in s:
+            s = s.split("::", 1)[1]
+        vistos.add(s)
+        url_limpia = normalizar_url_limpia(s)
+        if url_limpia:
+            vistos.add(url_limpia)
+        appid = extraer_appid_steam(s)
+        if appid:
+            vistos.add(f"steam_app:{appid}")
+    return vistos
 
 
 def ya_registrado(claves_entrada, historial_set):
@@ -272,7 +327,6 @@ def limpiar_html(
 ):
     raw = texto or ""
 
-    # Convierte etiquetas <a href="URL">texto</a> a enlaces Markdown clicables limpios
     def reemplazar_link(match):
         href = desempaquetar_url_steam(match.group(1).strip())
         etiqueta = re.sub(r"<[^>]+>", "", match.group(2)).strip()
@@ -290,7 +344,6 @@ def limpiar_html(
         flags=re.IGNORECASE | re.DOTALL,
     )
 
-    # Quita el resto de etiquetas HTML y precios
     limpio = re.sub(r"<[^>]+>", " ", con_links)
     limpio = re.sub(
         r"\b(?:Live)?\d+[.,]\d{2}\s*€|\$\s*\d+[.,]\d{2}",
@@ -299,7 +352,6 @@ def limpiar_html(
         flags=re.IGNORECASE,
     )
 
-    # Limpia enlaces markdown rotos del tipo [https://url](https://steamcommunity.com/linkfilter/?u=...)
     def limpiar_md_link(match):
         texto_visible = desempaquetar_url_steam(match.group(1).strip())
         destino = desempaquetar_url_steam(match.group(2).strip())
@@ -314,7 +366,6 @@ def limpiar_html(
     )
     limpio = " ".join(limpio.split())
 
-    # Quita cualquier remate previo de "Leer reseña completa en [Juego Hispano](...)" o "Juego Hispano"
     limpio = re.sub(
         r"\s*\.?\s*Leer\s+reseña\s+completa\s+en\s+\[[^\]]+\]\(https?://[^\s)]+\)\s*$",
         "",
@@ -344,7 +395,6 @@ def limpiar_html(
 
     limpio = deduplicar_texto_repetido(limpio)
 
-    # Solo agrega "Leer reseña completa en [Juego Hispano](url)" si el feed lo tiene activado y hay URL válida
     etiqueta = (etiqueta_enlace or "Juego Hispano").strip()
     frase = (frase_previa or "Leer reseña completa en").strip()
     if incluir_leer_resena and url_resena and url_resena.startswith("http"):
@@ -693,8 +743,8 @@ def main():
         os.environ.get("SEMILLA_SIN_ENVIAR", "false").lower() == "true"
     )
 
-    historial = cargar_lista_json(HISTORIAL_FILE)
-    historial_set = set(historial)
+    historial_por_feed = cargar_historial_agrupado(HISTORIAL_FILE)
+    historial_previo_global = historial_por_feed.get("Historial previo", [])
     log_envios = cargar_lista_json(LOG_FILE)
     logs_por_feed = {}
     feeds_con_log_nuevo = set()
@@ -710,19 +760,24 @@ def main():
     }
 
     for feed_cfg in feeds:
+        nombre_feed_actual = str(
+            feed_cfg.get("nombre") or "Feed sin nombre"
+        ).strip()
+
         if not feed_cfg.get("activo", True):
-            print(
-                f"Feed desactivado (activo=false): "
-                f"{feed_cfg.get('nombre', 'Sin nombre')}"
-            )
+            print(f"Feed desactivado (activo=false): {nombre_feed_actual}")
             continue
+
+        lista_historial_feed = historial_por_feed.setdefault(
+            nombre_feed_actual, []
+        )
+        historial_set_feed = construir_set_feed(
+            lista_historial_feed, historial_previo_global
+        )
 
         parsed = feedparser.parse(feed_cfg["rss_url"])
         if not parsed.entries:
-            print(
-                f"Sin entradas en el feed: "
-                f"{feed_cfg.get('nombre', 'Sin nombre')}"
-            )
+            print(f"Sin entradas en el feed: {nombre_feed_actual}")
             continue
 
         entradas_nuevas = []
@@ -732,26 +787,31 @@ def main():
                 e.get("description", ""),
                 " ".join(c.get("value", "") for c in e.get("content", [])),
             ])
-            claves = obtener_claves_entrada(e, bloque_previo)
-            if claves and not ya_registrado(claves, historial_set):
-                entradas_nuevas.append((e, claves))
-                for c in claves:
-                    historial_set.add(c)
+            claves_eq = obtener_claves_equivalentes(e, bloque_previo)
+            clave_principal = obtener_clave_principal(e, bloque_previo)
+            if clave_principal and not ya_registrado(
+                claves_eq, historial_set_feed
+            ):
+                entradas_nuevas.append((e, clave_principal, claves_eq))
+                for c in claves_eq:
+                    historial_set_feed.add(c)
 
         if not entradas_nuevas:
-            print(f"Sin novedades en {feed_cfg.get('nombre', 'Feed')}.")
+            print(f"Sin novedades en {nombre_feed_actual}.")
             continue
 
-        for entry, claves in entradas_nuevas:
-            uid = entry.get("id") or entry.get("link") or claves[0]
+        for entry, clave_principal, claves_eq in entradas_nuevas:
+            uid = entry.get("id") or entry.get("link") or clave_principal
 
             if solo_semilla:
-                for c in claves:
-                    if c not in historial:
-                        historial.append(c)
-                    historial_set.add(c)
+                if clave_principal not in lista_historial_feed:
+                    lista_historial_feed.append(clave_principal)
+                for c in claves_eq:
+                    historial_set_feed.add(c)
                 cambios_historial = True
-                print(f"[SEMILLA] Registrado sin enviar: {uid}")
+                print(
+                    f"[SEMILLA][{nombre_feed_actual}] Registrado sin enviar: {clave_principal}"
+                )
                 continue
 
             bloque_raw = " ".join([
@@ -825,13 +885,12 @@ def main():
                 url_api, headers=headers, json=payload, timeout=15
             )
             if resp.status_code in (200, 204):
-                for c in claves:
-                    if c not in historial:
-                        historial.append(c)
-                    historial_set.add(c)
+                if clave_principal not in lista_historial_feed:
+                    lista_historial_feed.append(clave_principal)
+                for c in claves_eq:
+                    historial_set_feed.add(c)
                 cambios_historial = True
 
-                nombre_feed_actual = feed_cfg.get("nombre", "")
                 registro_envio = {
                     "fecha_envio_utc": datetime.now(timezone.utc).isoformat(),
                     "feed": nombre_feed_actual,
@@ -850,12 +909,14 @@ def main():
                     )
                 logs_por_feed[ruta_individual].append(registro_envio)
                 feeds_con_log_nuevo.add(ruta_individual)
-                print(f"Publicado: {titulo}")
+                print(f"[{nombre_feed_actual}] Publicado: {titulo}")
             else:
-                print(f"Error al publicar ({resp.status_code}): {resp.text}")
+                print(
+                    f"[{nombre_feed_actual}] Error al publicar ({resp.status_code}): {resp.text}"
+                )
 
     if cambios_historial:
-        guardar_lista_json(HISTORIAL_FILE, historial[-2500:])
+        guardar_historial_agrupado(HISTORIAL_FILE, historial_por_feed)
     if cambios_log:
         guardar_lista_json(LOG_FILE, log_envios[-2000:])
     for ruta_individual in feeds_con_log_nuevo:
