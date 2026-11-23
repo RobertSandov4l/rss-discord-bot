@@ -1046,5 +1046,21 @@
     "titulo": "Reseña Worst Class Ever | El sueño de todo estudiante... ¡comer en clase!",
     "enlace": "https://juegohispano.com/mensaje/resena-worst-class-ever",
     "uid": "https://juegohispano.com/mensaje/resena-worst-class-ever"
+  },
+  {
+    "fecha_envio_utc": "2026-11-23T20:20:20.799639+00:00",
+    "feed": "Reseñas Curator Comuesp",
+    "channel_id": "1440370890368876595",
+    "titulo": "[Recomendado] Worst Class Ever",
+    "enlace": "https://store.steampowered.com/app/5175310/Worst_Class_Ever/",
+    "uid": "steam-curator-9753302-https-store-steampowered-com-app-5175310-Worst_Class_Ever--56d2dd7428"
+  },
+  {
+    "fecha_envio_utc": "2026-11-23T20:20:23.994310+00:00",
+    "feed": "Juego Hispano",
+    "channel_id": "1512911543946186874",
+    "titulo": "Reseña de Gloamfall | Historia entre sombras",
+    "enlace": "https://juegohispano.com/mensaje/resena-gloamfall",
+    "uid": "https://juegohispano.com/mensaje/resena-gloamfall"
   }
 ]
