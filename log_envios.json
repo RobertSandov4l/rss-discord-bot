@@ -1174,5 +1174,13 @@
     "titulo": "Reseña Horripilant | El descenso a la locura",
     "enlace": "https://juegohispano.com/mensaje/resena-horripilant",
     "uid": "https://juegohispano.com/mensaje/resena-horripilant"
+  },
+  {
+    "fecha_envio_utc": "2026-11-23T22:10:30.843841+00:00",
+    "feed": "Reseñas Curator Comuesp",
+    "channel_id": "1440370890368876595",
+    "titulo": "[Recomendado] Horripilant",
+    "enlace": "https://store.steampowered.com/app/3525970/Horripilant/",
+    "uid": "steam-curator-9753302-https-store-steampowered-com-app-3525970-Horripilant--2f603d68fe"
   }
 ]
