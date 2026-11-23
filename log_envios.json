@@ -934,5 +934,21 @@
     "titulo": "Ya están las nominaciones a los premios de Steam 2026",
     "enlace": "https://steamcommunity.com/groups/comuespanol/events//686396970470737016",
     "uid": "https://steamcommunity.com/groups/comuespanol/events//686396970470737016"
+  },
+  {
+    "fecha_envio_utc": "2026-11-23T19:40:21.611524+00:00",
+    "feed": "Reseñas Curator Comuesp",
+    "channel_id": "1440370890368876595",
+    "titulo": "[Recomendado] Coal Duty",
+    "enlace": "https://store.steampowered.com/app/4272370/Coal_Duty/",
+    "uid": "steam-curator-9753302-https-store-steampowered-com-app-4272370-Coal_Duty--34fa553e91"
+  },
+  {
+    "fecha_envio_utc": "2026-11-23T19:40:24.608399+00:00",
+    "feed": "Reseñas Curator Comuesp",
+    "channel_id": "1440370890368876595",
+    "titulo": "[Recomendado] Cozy Builder",
+    "enlace": "https://store.steampowered.com/app/4059000/Cozy_Builder/",
+    "uid": "steam-curator-9753302-https-store-steampowered-com-app-4059000-Cozy_Builder--539b3bbd14"
   }
 ]
