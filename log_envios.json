@@ -1062,5 +1062,21 @@
     "titulo": "Reseña de Gloamfall | Historia entre sombras",
     "enlace": "https://juegohispano.com/mensaje/resena-gloamfall",
     "uid": "https://juegohispano.com/mensaje/resena-gloamfall"
+  },
+  {
+    "fecha_envio_utc": "2026-11-23T20:40:22.006512+00:00",
+    "feed": "Reseñas Curator Comuesp",
+    "channel_id": "1440370890368876595",
+    "titulo": "[Recomendado] Gloamfall",
+    "enlace": "https://store.steampowered.com/app/5284270/Gloamfall/",
+    "uid": "steam-curator-9753302-https-store-steampowered-com-app-5284270-Gloamfall--e34d5ec454"
+  },
+  {
+    "fecha_envio_utc": "2026-11-23T20:40:25.004127+00:00",
+    "feed": "Juego Hispano",
+    "channel_id": "1512911543946186874",
+    "titulo": "Reseña Dice Have No Eyes | Una tirada más y lo pierdes todo",
+    "enlace": "https://juegohispano.com/mensaje/resena-dice-have-no-eyes",
+    "uid": "https://juegohispano.com/mensaje/resena-dice-have-no-eyes"
   }
 ]
