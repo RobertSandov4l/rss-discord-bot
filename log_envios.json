@@ -1030,5 +1030,21 @@
     "titulo": "Reseña Cardaire: Eternal Aces | Cartas que cuentan más que una historia",
     "enlace": "https://juegohispano.com/mensaje/resena-cardaire-eternal-aces",
     "uid": "https://juegohispano.com/mensaje/resena-cardaire-eternal-aces"
+  },
+  {
+    "fecha_envio_utc": "2026-11-23T20:10:22.342120+00:00",
+    "feed": "Reseñas Curator Comuesp",
+    "channel_id": "1440370890368876595",
+    "titulo": "[Recomendado] Cardaire Eternal Aces",
+    "enlace": "https://store.steampowered.com/app/4077320/Cardaire_Eternal_Aces/",
+    "uid": "steam-curator-9753302-https-store-steampowered-com-app-4077320-Cardaire_Eternal_Aces--f70300182d"
+  },
+  {
+    "fecha_envio_utc": "2026-11-23T20:10:26.951439+00:00",
+    "feed": "Juego Hispano",
+    "channel_id": "1512911543946186874",
+    "titulo": "Reseña Worst Class Ever | El sueño de todo estudiante... ¡comer en clase!",
+    "enlace": "https://juegohispano.com/mensaje/resena-worst-class-ever",
+    "uid": "https://juegohispano.com/mensaje/resena-worst-class-ever"
   }
 ]
