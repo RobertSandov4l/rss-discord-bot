@@ -662,5 +662,21 @@
     "titulo": "[Informativo] I Know a Spot",
     "enlace": "https://store.steampowered.com/app/4207100/I_Know_a_Spot/",
     "uid": "steam-curator-9753302-https-store-steampowered-com-app-4207100-I_Know_a_Spot--9448e27936"
+  },
+  {
+    "fecha_envio_utc": "2026-11-24T21:30:25.441090+00:00",
+    "feed": "Reseñas Curator Comuesp",
+    "channel_id": "1440370890368876595",
+    "titulo": "[Recomendado] Kick",
+    "enlace": "https://store.steampowered.com/app/3760370/Kick/",
+    "uid": "steam-curator-9753302-https-store-steampowered-com-app-3760370-Kick--12b08fa5fc"
+  },
+  {
+    "fecha_envio_utc": "2026-11-24T21:30:28.466618+00:00",
+    "feed": "Reseñas Curator Comuesp",
+    "channel_id": "1440370890368876595",
+    "titulo": "[Recomendado] Knuckle Creek",
+    "enlace": "https://store.steampowered.com/app/4652930/Knuckle_Creek/",
+    "uid": "steam-curator-9753302-https-store-steampowered-com-app-4652930-Knuckle_Creek--8ba596095b"
   }
 ]
