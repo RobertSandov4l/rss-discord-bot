@@ -742,5 +742,37 @@
     "titulo": "[Informativo] Permafrost",
     "enlace": "https://store.steampowered.com/app/2254990/Permafrost/",
     "uid": "steam-curator-9753302-https-store-steampowered-com-app-2254990-Permafrost--5292df3e6c"
+  },
+  {
+    "fecha_envio_utc": "2026-11-24T22:20:20.355774+00:00",
+    "feed": "Reseñas Curator Comuesp",
+    "channel_id": "1440370890368876595",
+    "titulo": "[Informativo] Pig King",
+    "enlace": "https://store.steampowered.com/app/4563590/Pig_King/",
+    "uid": "steam-curator-9753302-https-store-steampowered-com-app-4563590-Pig_King--5ab4beefce"
+  },
+  {
+    "fecha_envio_utc": "2026-11-24T22:20:22.734220+00:00",
+    "feed": "Reseñas Curator Comuesp",
+    "channel_id": "1440370890368876595",
+    "titulo": "[Recomendado] PIT OF GOBLIN",
+    "enlace": "https://store.steampowered.com/app/3253530/PIT_OF_GOBLIN/",
+    "uid": "steam-curator-9753302-https-store-steampowered-com-app-3253530-PIT_OF_GOBLIN--ffe7307aa9"
+  },
+  {
+    "fecha_envio_utc": "2026-11-24T22:20:26.205123+00:00",
+    "feed": "Reseñas Curator Comuesp",
+    "channel_id": "1440370890368876595",
+    "titulo": "[Informativo] Pool of Radiance Ruins of Myth Drannor",
+    "enlace": "https://store.steampowered.com/app/4834760/Pool_of_Radiance_Ruins_of_Myth_Drannor/",
+    "uid": "steam-curator-9753302-https-store-steampowered-com-app-4834760-Pool_of_Radiance_Ruins_of_Myth_Drannor--e12c57d8e5"
+  },
+  {
+    "fecha_envio_utc": "2026-11-24T22:20:28.592426+00:00",
+    "feed": "Reseñas Curator Comuesp",
+    "channel_id": "1440370890368876595",
+    "titulo": "[Recomendado] Primal Planet",
+    "enlace": "https://store.steampowered.com/app/2350270/Primal_Planet/",
+    "uid": "steam-curator-9753302-https-store-steampowered-com-app-2350270-Primal_Planet--a89f3e3df3"
   }
 ]
