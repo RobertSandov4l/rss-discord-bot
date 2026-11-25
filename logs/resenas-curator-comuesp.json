@@ -790,5 +790,21 @@
     "titulo": "[Informativo] Pancake Patrol",
     "enlace": "https://store.steampowered.com/app/2587840/Pancake_Patrol/",
     "uid": "steam-curator-9753302-https-store-steampowered-com-app-2587840-Pancake_Patrol--8f87462307"
+  },
+  {
+    "fecha_envio_utc": "2026-11-25T04:30:26.822480+00:00",
+    "feed": "Reseñas Curator Comuesp",
+    "channel_id": "1440370890368876595",
+    "titulo": "[Informativo] TOREROWA",
+    "enlace": "https://store.steampowered.com/app/2753740/TOREROWA/",
+    "uid": "steam-curator-9753302-https-store-steampowered-com-app-2753740-TOREROWA--2320841dc0"
+  },
+  {
+    "fecha_envio_utc": "2026-11-25T04:30:30.019649+00:00",
+    "feed": "Reseñas Curator Comuesp",
+    "channel_id": "1440370890368876595",
+    "titulo": "[Recomendado] Strike and Pop",
+    "enlace": "https://store.steampowered.com/app/3624340/Strike_and_Pop/",
+    "uid": "steam-curator-9753302-https-store-steampowered-com-app-3624340-Strike_and_Pop--280caaa468"
   }
 ]
