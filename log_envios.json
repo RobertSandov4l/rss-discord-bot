@@ -1574,5 +1574,13 @@
     "titulo": "Reseña John Gleep | Apuestas, deudas y un dentista",
     "enlace": "https://juegohispano.com/mensaje/resena-john-gleep",
     "uid": "https://juegohispano.com/mensaje/resena-john-gleep"
+  },
+  {
+    "fecha_envio_utc": "2026-11-26T19:10:20.911176+00:00",
+    "feed": "Reseñas Curator Comuesp",
+    "channel_id": "1440370890368876595",
+    "titulo": "[Informativo] JOHN GLEEP",
+    "enlace": "https://store.steampowered.com/app/4739500/JOHN_GLEEP/",
+    "uid": "steam-curator-9753302-https-store-steampowered-com-app-4739500-JOHN_GLEEP--66468a90d5"
   }
 ]
