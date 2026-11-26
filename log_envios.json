@@ -1590,5 +1590,13 @@
     "titulo": "Reseña Roombattle | Un party battler con mucho polvo y demasiados golpes",
     "enlace": "https://juegohispano.com/mensaje/resena-roombattle",
     "uid": "https://juegohispano.com/mensaje/resena-roombattle"
+  },
+  {
+    "fecha_envio_utc": "2026-11-26T19:50:20.244742+00:00",
+    "feed": "Reseñas Curator Comuesp",
+    "channel_id": "1440370890368876595",
+    "titulo": "[Recomendado] Roombattle",
+    "enlace": "https://store.steampowered.com/app/3223000/Roombattle/",
+    "uid": "steam-curator-9753302-https-store-steampowered-com-app-3223000-Roombattle--d3e0f1ba31"
   }
 ]
