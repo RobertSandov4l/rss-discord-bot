@@ -1486,5 +1486,29 @@
     "titulo": "Reseña Split Brain Samsara | Dos mentes, 1 problema",
     "enlace": "https://juegohispano.com/mensaje/resena-split-brain-samsara",
     "uid": "https://juegohispano.com/mensaje/resena-split-brain-samsara"
+  },
+  {
+    "fecha_envio_utc": "2026-11-26T16:40:26.345464+00:00",
+    "feed": "Juego Hispano",
+    "channel_id": "1512911543946186874",
+    "titulo": "Reseña Night of the Idle Horde | Un apocalipsis zombi para tu escritorio",
+    "enlace": "https://juegohispano.com/mensaje/resena-night-of-the-idle-horde",
+    "uid": "https://juegohispano.com/mensaje/resena-night-of-the-idle-horde"
+  },
+  {
+    "fecha_envio_utc": "2026-11-26T16:40:29.688307+00:00",
+    "feed": "Comunidad en español",
+    "channel_id": "1440368053337587722",
+    "titulo": "BUSCAMOS STAFF PARA JUEGO HISPANO",
+    "enlace": "https://steamcommunity.com/groups/comuespanol/announcements/detail/686397604216440132",
+    "uid": "https://steamcommunity.com/groups/comuespanol/announcements/detail/686397604216440132"
+  },
+  {
+    "fecha_envio_utc": "2026-11-26T16:40:32.420926+00:00",
+    "feed": "Comunidad en español",
+    "channel_id": "1440368053337587722",
+    "titulo": "BUSCAMOS STAFF PARA JUEGO HISPANO",
+    "enlace": "https://steamcommunity.com/groups/comuespanol/events//686397604216440131",
+    "uid": "https://steamcommunity.com/groups/comuespanol/events//686397604216440131"
   }
 ]
