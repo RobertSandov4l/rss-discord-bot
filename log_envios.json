@@ -1582,5 +1582,13 @@
     "titulo": "[Informativo] JOHN GLEEP",
     "enlace": "https://store.steampowered.com/app/4739500/JOHN_GLEEP/",
     "uid": "steam-curator-9753302-https-store-steampowered-com-app-4739500-JOHN_GLEEP--66468a90d5"
+  },
+  {
+    "fecha_envio_utc": "2026-11-26T19:40:21.225433+00:00",
+    "feed": "Juego Hispano",
+    "channel_id": "1512911543946186874",
+    "titulo": "Reseña Roombattle | Un party battler con mucho polvo y demasiados golpes",
+    "enlace": "https://juegohispano.com/mensaje/resena-roombattle",
+    "uid": "https://juegohispano.com/mensaje/resena-roombattle"
   }
 ]
