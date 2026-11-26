@@ -1606,5 +1606,13 @@
     "titulo": "Reseña Blacksmith Master | Gestiona tu herrería en el medievo",
     "enlace": "https://juegohispano.com/mensaje/resena-blacksmith-master",
     "uid": "https://juegohispano.com/mensaje/resena-blacksmith-master"
+  },
+  {
+    "fecha_envio_utc": "2026-11-26T21:10:23.199116+00:00",
+    "feed": "Juego Hispano",
+    "channel_id": "1512911543946186874",
+    "titulo": "Reseña de Planted! | Siembra, cosecha y compite",
+    "enlace": "https://juegohispano.com/mensaje/resena-de-planted",
+    "uid": "https://juegohispano.com/mensaje/resena-de-planted"
   }
 ]
