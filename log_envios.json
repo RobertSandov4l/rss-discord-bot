@@ -1646,5 +1646,13 @@
     "titulo": "Reseña Terrible Lizards | un museo jurásico donde correr es sobrevivir",
     "enlace": "https://juegohispano.com/mensaje/resena-terrible-lizards",
     "uid": "https://juegohispano.com/mensaje/resena-terrible-lizards"
+  },
+  {
+    "fecha_envio_utc": "2026-11-27T05:20:21.926103+00:00",
+    "feed": "Reseñas Curator Comuesp",
+    "channel_id": "1440370890368876595",
+    "titulo": "[Recomendado] Terrible Lizards",
+    "enlace": "https://store.steampowered.com/app/2920220/Terrible_Lizards/",
+    "uid": "steam-curator-9753302-https-store-steampowered-com-app-2920220-Terrible_Lizards--fef8d6f848"
   }
 ]
