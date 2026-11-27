@@ -1638,5 +1638,13 @@
     "titulo": "[Recomendado] ORDER 13",
     "enlace": "https://store.steampowered.com/app/2259310/ORDER_13/",
     "uid": "steam-curator-9753302-https-store-steampowered-com-app-2259310-ORDER_13--7f0f239acf"
+  },
+  {
+    "fecha_envio_utc": "2026-11-27T04:20:21.242304+00:00",
+    "feed": "Juego Hispano",
+    "channel_id": "1512911543946186874",
+    "titulo": "Reseña Terrible Lizards | un museo jurásico donde correr es sobrevivir",
+    "enlace": "https://juegohispano.com/mensaje/resena-terrible-lizards",
+    "uid": "https://juegohispano.com/mensaje/resena-terrible-lizards"
   }
 ]
