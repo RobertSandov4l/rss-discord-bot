@@ -1686,5 +1686,13 @@
     "titulo": "Reseña ShipShaper | Diseña tu propia embarcación para conquistar el mundo",
     "enlace": "https://juegohispano.com/mensaje/resena-shipshaper",
     "uid": "https://juegohispano.com/mensaje/resena-shipshaper"
+  },
+  {
+    "fecha_envio_utc": "2026-11-27T23:00:26.394372+00:00",
+    "feed": "Juego Hispano",
+    "channel_id": "1512911543946186874",
+    "titulo": "Reseña Arctic Drive | Conduciendo bajo el cero absoluto",
+    "enlace": "https://juegohispano.com/mensaje/resena-arctic-drive",
+    "uid": "https://juegohispano.com/mensaje/resena-arctic-drive"
   }
 ]
